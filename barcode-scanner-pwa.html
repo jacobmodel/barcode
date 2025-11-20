@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#2c3e50">
+    <title>Barcode Scanner PWA</title>
+    
+    <!-- Include QuaggaJS as fallback -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #1a1a1a;
+            color: #fff;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+        }
+
+        #app {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #header {
+            background: rgba(44, 62, 80, 0.9);
+            padding: 12px;
+            text-align: center;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        #header h1 {
+            font-size: 1.2rem;
+            font-weight: 600;
+        }
+
+        #status {
+            font-size: 0.9rem;
+            margin-top: 4px;
+            color: #3498db;
+        }
+
+        #scanner-container {
+            position: relative;
+            flex: 1;
+            overflow: hidden;
+            background: #000;
+        }
+
+        #video {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .barcode-overlay {
+            position: absolute;
+            border: 3px solid #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+            border-radius: 4px;
+            z-index: 20;
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+
+        .barcode-overlay.uncertain {
+            border-color: #ffa500;
+            background: rgba(255, 165, 0, 0.1);
+        }
+
+        .barcode-label {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: #00ff00;
+            padding: 6px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+            white-space: nowrap;
+            z-index: 25;
+            pointer-events: none;
+            backdrop-filter: blur(5px);
+        }
+
+        .barcode-label.uncertain {
+            background: rgba(255, 165, 0, 0.9);
+            color: #fff;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 30;
+        }
+
+        .control-btn {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            color: #fff;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        .control-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            text-align: center;
+        }
+
+        #start-screen h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+        }
+
+        #start-screen p {
+            font-size: 1rem;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid #fff;
+            color: #fff;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #start-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+            transform: translateY(-2px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        #detected-list {
+            position: absolute;
+            top: 80px;
+            left: 10px;
+            right: 10px;
+            max-height: 150px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 8px;
+            padding: 10px;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+        }
+
+        .detected-item {
+            padding: 8px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            font-size: 0.9rem;
+        }
+
+        .detected-item:last-child {
+            border-bottom: none;
+        }
+
+        .detected-item .type {
+            color: #3498db;
+            font-size: 0.8rem;
+        }
+
+        @media (max-width: 480px) {
+            #header h1 {
+                font-size: 1rem;
+            }
+            
+            .control-btn {
+                width: 50px;
+                height: 50px;
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="start-screen">
+            <h2>📷 Barcode Scanner</h2>
+            <p>Tap below to start scanning barcodes with your camera</p>
+            <button id="start-btn">Start Camera</button>
+            <div id="debug-info" style="margin-top: 30px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; font-size: 0.9rem; text-align: left;">
+                <div style="margin-bottom: 5px;">📍 Protocol: <span id="protocol"></span></div>
+                <div style="margin-bottom: 5px;">🔒 Secure Context: <span id="secure"></span></div>
+                <div style="margin-bottom: 5px;">📸 Camera API: <span id="camera-api"></span></div>
+                <div>🔑 Permissions API: <span id="perm-api"></span></div>
+            </div>
+        </div>
+
+        <div id="header">
+            <h1>Barcode Scanner</h1>
+            <div id="status">Initializing...</div>
+        </div>
+
+        <div id="scanner-container">
+            <video id="video" playsinline></video>
+            <canvas id="overlay-canvas"></canvas>
+            <div id="detected-list" class="hidden"></div>
+        </div>
+
+        <div id="controls">
+            <button class="control-btn" id="toggle-flash" title="Toggle Flash">
+                💡
+            </button>
+            <button class="control-btn" id="clear-btn" title="Clear Detections">
+                🔄
+            </button>
+        </div>
+    </div>
+
+    <script>
+        class BarcodeScanner {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('overlay-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.status = document.getElementById('status');
+                this.detectedList = document.getElementById('detected-list');
+                this.startScreen = document.getElementById('start-screen');
+                this.startBtn = document.getElementById('start-btn');
+                this.clearBtn = document.getElementById('clear-btn');
+                this.toggleFlashBtn = document.getElementById('toggle-flash');
+                
+                this.stream = null;
+                this.track = null;
+                this.useNativeAPI = false;
+                this.detectedBarcodes = new Map();
+                this.overlayElements = [];
+                this.scanning = false;
+                this.flashEnabled = false;
+                
+                this.init();
+            }
+
+            async init() {
+                // Show debug information
+                this.showDebugInfo();
+                
+                // Check for native BarcodeDetector API
+                if ('BarcodeDetector' in window) {
+                    try {
+                        const formats = await BarcodeDetector.getSupportedFormats();
+                        if (formats.length > 0) {
+                            this.useNativeAPI = true;
+                            this.detector = new BarcodeDetector({ formats });
+                            console.log('Using native BarcodeDetector API');
+                        }
+                    } catch (err) {
+                        console.log('BarcodeDetector not available, falling back to QuaggaJS');
+                    }
+                }
+
+                // Event listeners
+                this.startBtn.addEventListener('click', () => this.startCamera());
+                this.clearBtn.addEventListener('click', () => this.clearDetections());
+                this.toggleFlashBtn.addEventListener('click', () => this.toggleFlash());
+                
+                // Handle resize
+                window.addEventListener('resize', () => this.resizeCanvas());
+            }
+
+            showDebugInfo() {
+                // Show protocol
+                document.getElementById('protocol').textContent = location.protocol;
+                document.getElementById('protocol').style.color = 
+                    location.protocol === 'https:' ? '#00ff00' : '#ff0000';
+                
+                // Check secure context
+                const isSecure = window.isSecureContext;
+                document.getElementById('secure').textContent = isSecure ? 'Yes ✓' : 'No ✗';
+                document.getElementById('secure').style.color = isSecure ? '#00ff00' : '#ff0000';
+                
+                // Check camera API
+                const hasCameraAPI = 'mediaDevices' in navigator && 'getUserMedia' in navigator.mediaDevices;
+                document.getElementById('camera-api').textContent = hasCameraAPI ? 'Available ✓' : 'Not Available ✗';
+                document.getElementById('camera-api').style.color = hasCameraAPI ? '#00ff00' : '#ff0000';
+                
+                // Check permissions API
+                const hasPermAPI = 'permissions' in navigator;
+                document.getElementById('perm-api').textContent = hasPermAPI ? 'Available ✓' : 'Not Available ✗';
+                document.getElementById('perm-api').style.color = hasPermAPI ? '#00ff00' : '#ff0000';
+                
+                // Add warning if not secure
+                if (!isSecure) {
+                    const warning = document.createElement('div');
+                    warning.style.cssText = 'margin-top: 15px; padding: 10px; background: #e74c3c; border-radius: 5px;';
+                    warning.innerHTML = '<strong>⚠️ Warning:</strong> Camera access requires HTTPS or localhost. Please access this page via HTTPS.';
+                    document.getElementById('debug-info').appendChild(warning);
+                }
+            }
+
+            async checkPermission() {
+                // Check if we're on HTTPS or localhost
+                const isSecure = location.protocol === 'https:' || location.hostname === 'localhost';
+                if (!isSecure) {
+                    this.showPermissionHelp('This app requires HTTPS to access the camera. Please use HTTPS or localhost.');
+                    return false;
+                }
+
+                // Check if permissions API is available
+                if ('permissions' in navigator) {
+                    try {
+                        const result = await navigator.permissions.query({ name: 'camera' });
+                        console.log('Camera permission status:', result.state);
+                        
+                        if (result.state === 'denied') {
+                            this.showPermissionHelp('Camera access is blocked. Please check site settings and allow camera access.');
+                            return false;
+                        }
+                        
+                        // Listen for permission changes
+                        result.onchange = () => {
+                            console.log('Permission state changed to:', result.state);
+                            if (result.state === 'granted') {
+                                this.startCamera();
+                            }
+                        };
+                        
+                        return result.state === 'granted' || result.state === 'prompt';
+                    } catch (err) {
+                        console.log('Permission query failed:', err);
+                        // Continue anyway - some browsers don't support permission query
+                        return true;
+                    }
+                }
+                return true;
+            }
+
+            showPermissionHelp(message) {
+                this.status.textContent = 'Camera permission issue';
+                const helpDiv = document.createElement('div');
+                helpDiv.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0,0,0,0.9);
+                    color: white;
+                    padding: 20px;
+                    border-radius: 10px;
+                    max-width: 90%;
+                    z-index: 2000;
+                    text-align: left;
+                `;
+                helpDiv.innerHTML = `
+                    <h3 style="margin-top: 0;">Camera Permission Required</h3>
+                    <p>${message}</p>
+                    <h4>To fix on Chrome Android:</h4>
+                    <ol style="padding-left: 20px;">
+                        <li>Tap the <strong>lock icon</strong> in the address bar</li>
+                        <li>Tap <strong>Site settings</strong></li>
+                        <li>Tap <strong>Camera</strong></li>
+                        <li>Select <strong>Allow</strong></li>
+                        <li>Go back and <strong>refresh</strong> the page</li>
+                    </ol>
+                    <h4>Alternative:</h4>
+                    <p>Clear site data: Lock icon → Site settings → Clear & reset</p>
+                    <button id="close-help" style="
+                        background: #3498db;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        margin-top: 10px;
+                        cursor: pointer;
+                    ">Close & Try Again</button>
+                `;
+                document.body.appendChild(helpDiv);
+                
+                document.getElementById('close-help').addEventListener('click', () => {
+                    document.body.removeChild(helpDiv);
+                    this.startScreen.classList.remove('hidden');
+                });
+            }
+
+            async startCamera() {
+                try {
+                    // First check permissions
+                    const canProceed = await this.checkPermission();
+                    if (!canProceed) {
+                        this.startScreen.classList.remove('hidden');
+                        return;
+                    }
+
+                    this.startScreen.classList.add('hidden');
+                    this.status.textContent = 'Requesting camera access...';
+                    
+                    // Add more specific constraints for Android Chrome
+                    const constraints = {
+                        video: {
+                            facingMode: { ideal: 'environment' },
+                            width: { ideal: 1920, min: 640 },
+                            height: { ideal: 1080, min: 480 }
+                        },
+                        audio: false  // Explicitly set audio to false
+                    };
+
+                    console.log('Requesting getUserMedia with constraints:', constraints);
+                    
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    console.log('Camera access granted!');
+                    
+                    this.video.srcObject = this.stream;
+                    this.track = this.stream.getVideoTracks()[0];
+                    
+                    // Check for torch capability
+                    const capabilities = this.track.getCapabilities();
+                    if (capabilities.torch) {
+                        this.toggleFlashBtn.style.display = 'flex';
+                    } else {
+                        this.toggleFlashBtn.style.display = 'none';
+                    }
+                    
+                    await this.video.play();
+                    
+                    this.resizeCanvas();
+                    this.scanning = true;
+                    this.status.textContent = this.useNativeAPI ? 
+                        'Scanning (Native API)...' : 
+                        'Scanning (QuaggaJS)...';
+                    
+                    if (this.useNativeAPI) {
+                        this.scanWithNativeAPI();
+                    } else {
+                        this.initQuagga();
+                    }
+                } catch (err) {
+                    console.error('Error accessing camera:', err);
+                    console.error('Error name:', err.name);
+                    console.error('Error message:', err.message);
+                    
+                    this.startScreen.classList.remove('hidden');
+                    
+                    if (err.name === 'NotAllowedError') {
+                        this.showPermissionHelp('Camera access was denied. This usually means the permission was blocked at the browser or system level.');
+                    } else if (err.name === 'NotFoundError') {
+                        this.status.textContent = 'No camera found';
+                        alert('No camera device was found. Please ensure your device has a camera.');
+                    } else if (err.name === 'NotReadableError') {
+                        this.status.textContent = 'Camera in use';
+                        alert('Camera is already in use by another application. Please close other camera apps and try again.');
+                    } else if (err.name === 'OverconstrainedError') {
+                        // Try again with simpler constraints
+                        console.log('Constraints too strict, trying with basic constraints...');
+                        try {
+                            this.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                            this.video.srcObject = this.stream;
+                            await this.video.play();
+                            this.resizeCanvas();
+                            this.scanning = true;
+                            this.status.textContent = 'Scanning...';
+                            if (this.useNativeAPI) {
+                                this.scanWithNativeAPI();
+                            } else {
+                                this.initQuagga();
+                            }
+                        } catch (fallbackErr) {
+                            this.status.textContent = 'Camera access failed';
+                            alert('Unable to access camera. Error: ' + fallbackErr.message);
+                        }
+                    } else {
+                        this.status.textContent = 'Camera access failed';
+                        alert('Unable to access camera. Error: ' + err.message);
+                    }
+                }
+            }
+
+            resizeCanvas() {
+                const rect = this.video.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+            }
+
+            async scanWithNativeAPI() {
+                if (!this.scanning) return;
+
+                try {
+                    const barcodes = await this.detector.detect(this.video);
+                    this.clearOverlays();
+                    
+                    barcodes.forEach(barcode => {
+                        const key = `${barcode.rawValue}-${barcode.format}`;
+                        
+                        if (!this.detectedBarcodes.has(key)) {
+                            this.detectedBarcodes.set(key, {
+                                value: barcode.rawValue,
+                                format: barcode.format,
+                                timestamp: Date.now()
+                            });
+                            this.updateDetectedList();
+                        }
+                        
+                        this.drawBarcodeOverlay(barcode);
+                    });
+                } catch (err) {
+                    console.error('Scanning error:', err);
+                }
+
+                if (this.scanning) {
+                    requestAnimationFrame(() => this.scanWithNativeAPI());
+                }
+            }
+
+            initQuagga() {
+                const scanArea = document.getElementById('scanner-container');
+                
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: this.video,
+                        constraints: {
+                            facingMode: "environment"
+                        }
+                    },
+                    locator: {
+                        patchSize: "medium",
+                        halfSample: true
+                    },
+                    numOfWorkers: navigator.hardwareConcurrency || 4,
+                    frequency: 10,
+                    decoder: {
+                        readers: [
+                            "code_128_reader",
+                            "ean_reader",
+                            "ean_8_reader",
+                            "code_39_reader",
+                            "code_39_vin_reader",
+                            "codabar_reader",
+                            "upc_reader",
+                            "upc_e_reader",
+                            "i2of5_reader"
+                        ]
+                    },
+                    locate: true
+                }, (err) => {
+                    if (err) {
+                        console.error('Quagga init error:', err);
+                        this.status.textContent = 'Scanner initialization failed';
+                        return;
+                    }
+                    Quagga.start();
+                });
+
+                Quagga.onDetected((result) => {
+                    const code = result.codeResult.code;
+                    const format = result.codeResult.format;
+                    const key = `${code}-${format}`;
+                    
+                    if (!this.detectedBarcodes.has(key)) {
+                        this.detectedBarcodes.set(key, {
+                            value: code,
+                            format: format,
+                            timestamp: Date.now()
+                        });
+                        this.updateDetectedList();
+                    }
+                    
+                    this.drawQuaggaOverlay(result);
+                });
+
+                Quagga.onProcessed((result) => {
+                    this.clearOverlays();
+                    
+                    if (result && result.boxes) {
+                        result.boxes.filter(box => box !== result.box).forEach(box => {
+                            this.drawBox(box, 'uncertain');
+                        });
+                        
+                        if (result.box) {
+                            this.drawBox(result.box, 'detected');
+                        }
+                        
+                        if (result.codeResult && result.codeResult.code) {
+                            this.drawQuaggaOverlay(result);
+                        }
+                    }
+                });
+            }
+
+            drawBarcodeOverlay(barcode) {
+                const { cornerPoints, boundingBox } = barcode;
+                const rect = this.video.getBoundingClientRect();
+                
+                // Draw on canvas
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                
+                if (cornerPoints && cornerPoints.length > 0) {
+                    const scaleX = this.canvas.width / this.video.videoWidth;
+                    const scaleY = this.canvas.height / this.video.videoHeight;
+                    
+                    cornerPoints.forEach((point, i) => {
+                        const x = point.x * scaleX;
+                        const y = point.y * scaleY;
+                        if (i === 0) {
+                            this.ctx.moveTo(x, y);
+                        } else {
+                            this.ctx.lineTo(x, y);
+                        }
+                    });
+                    this.ctx.closePath();
+                    this.ctx.stroke();
+                    
+                    // Add label
+                    const label = this.createLabel(
+                        barcode.rawValue, 
+                        barcode.format,
+                        cornerPoints[0].x * scaleX,
+                        cornerPoints[0].y * scaleY - 10
+                    );
+                    this.overlayElements.push(label);
+                }
+            }
+
+            drawQuaggaOverlay(result) {
+                const code = result.codeResult.code;
+                const format = result.codeResult.format;
+                const box = result.box;
+                
+                if (box && box.length >= 2) {
+                    const rect = this.video.getBoundingClientRect();
+                    const scaleX = rect.width / this.video.videoWidth;
+                    const scaleY = rect.height / this.video.videoHeight;
+                    
+                    // Draw box
+                    this.ctx.strokeStyle = '#00ff00';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(box[0][0] * scaleX, box[0][1] * scaleY);
+                    box.forEach(point => {
+                        this.ctx.lineTo(point[0] * scaleX, point[1] * scaleY);
+                    });
+                    this.ctx.closePath();
+                    this.ctx.stroke();
+                    
+                    // Add label
+                    const label = this.createLabel(
+                        code,
+                        format,
+                        box[0][0] * scaleX,
+                        box[0][1] * scaleY - 10
+                    );
+                    this.overlayElements.push(label);
+                }
+            }
+
+            drawBox(box, type) {
+                if (!box || box.length < 2) return;
+                
+                const rect = this.video.getBoundingClientRect();
+                const scaleX = rect.width / this.video.videoWidth;
+                const scaleY = rect.height / this.video.videoHeight;
+                
+                this.ctx.strokeStyle = type === 'uncertain' ? '#ffa500' : '#00ff00';
+                this.ctx.lineWidth = type === 'uncertain' ? 2 : 3;
+                this.ctx.setLineDash(type === 'uncertain' ? [5, 5] : []);
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(box[0][0] * scaleX, box[0][1] * scaleY);
+                box.forEach(point => {
+                    this.ctx.lineTo(point[0] * scaleX, point[1] * scaleY);
+                });
+                this.ctx.closePath();
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+                
+                if (type === 'uncertain') {
+                    const label = this.createLabel(
+                        'Possible barcode?',
+                        '',
+                        box[0][0] * scaleX,
+                        box[0][1] * scaleY - 10,
+                        true
+                    );
+                    this.overlayElements.push(label);
+                }
+            }
+
+            createLabel(value, format, x, y, uncertain = false) {
+                const label = document.createElement('div');
+                label.className = `barcode-label ${uncertain ? 'uncertain' : ''}`;
+                label.textContent = uncertain ? value : `${value} (${format})`;
+                label.style.left = `${x}px`;
+                label.style.top = `${y}px`;
+                document.getElementById('scanner-container').appendChild(label);
+                return label;
+            }
+
+            clearOverlays() {
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Remove DOM overlay elements
+                this.overlayElements.forEach(el => {
+                    if (el && el.parentNode) {
+                        el.parentNode.removeChild(el);
+                    }
+                });
+                this.overlayElements = [];
+            }
+
+            updateDetectedList() {
+                if (this.detectedBarcodes.size === 0) {
+                    this.detectedList.classList.add('hidden');
+                    return;
+                }
+                
+                this.detectedList.classList.remove('hidden');
+                this.detectedList.innerHTML = '<div style="font-weight: bold; margin-bottom: 10px;">Detected Barcodes:</div>';
+                
+                this.detectedBarcodes.forEach((data, key) => {
+                    const item = document.createElement('div');
+                    item.className = 'detected-item';
+                    item.innerHTML = `
+                        <div>${data.value}</div>
+                        <div class="type">${data.format}</div>
+                    `;
+                    this.detectedList.appendChild(item);
+                });
+            }
+
+            clearDetections() {
+                this.detectedBarcodes.clear();
+                this.clearOverlays();
+                this.updateDetectedList();
+                this.status.textContent = 'Detections cleared';
+                setTimeout(() => {
+                    this.status.textContent = this.useNativeAPI ? 
+                        'Scanning (Native API)...' : 
+                        'Scanning (QuaggaJS)...';
+                }, 1500);
+            }
+
+            async toggleFlash() {
+                if (!this.track) return;
+                
+                try {
+                    this.flashEnabled = !this.flashEnabled;
+                    await this.track.applyConstraints({
+                        advanced: [{ torch: this.flashEnabled }]
+                    });
+                    this.toggleFlashBtn.style.background = this.flashEnabled ? 
+                        'rgba(255, 255, 0, 0.3)' : 
+                        'rgba(255, 255, 255, 0.2)';
+                } catch (err) {
+                    console.error('Error toggling flash:', err);
+                }
+            }
+
+            stop() {
+                this.scanning = false;
+                
+                if (!this.useNativeAPI && typeof Quagga !== 'undefined') {
+                    Quagga.stop();
+                }
+                
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                this.clearOverlays();
+            }
+        }
+
+        // Initialize scanner when page loads
+        let scanner;
+        window.addEventListener('DOMContentLoaded', () => {
+            scanner = new BarcodeScanner();
+        });
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (scanner) {
+                scanner.stop();
+            }
+        });
+
+        // PWA install prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+
+        // Service worker registration (for full PWA functionality)
+        if ('serviceWorker' in navigator) {
+            // You would need to create a separate service worker file for full PWA functionality
+            console.log('Service Worker support detected');
+        }
+    </script>
+</body>
+</html>
