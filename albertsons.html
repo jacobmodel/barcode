@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#003DA5">
+    <meta name="description" content="Scan product barcodes to get nutrition information, prices, and product details while shopping at Albertsons.">
+    <title>Albertsons Barcode Scanner - Scan Products for Nutrition &amp; Price Info</title>
+    
+    <!-- Include QuaggaJS as fallback -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    
+    <style>
+        :root {
+            --albertsons-blue: #003DA5;
+            --albertsons-light-blue: #1E5AA8;
+            --albertsons-dark-blue: #002B7A;
+            --albertsons-white: #FFFFFF;
+            --albertsons-light-gray: #F5F7FA;
+            --albertsons-gray: #4B5563; /* Improved contrast from #6B7280 */
+            --albertsons-dark-gray: #1F2937; /* Improved contrast from #374151 */
+            --albertsons-green: #059669; /* Improved contrast from #10B981 */
+            --albertsons-red: #DC2626; /* Improved contrast from #EF4444 */
+            --albertsons-orange: #D97706; /* Improved contrast from #F59E0B */
+            
+            /* Focus and accessibility colors */
+            --focus-color: #2563EB;
+            --focus-outline: 3px solid var(--focus-color);
+        }
+
+        .attribution {
+            margin-top: 40px;
+            padding: 20px;
+            background: rgba(0, 61, 165, 0.05);
+            border: 1px solid rgba(0, 61, 165, 0.1);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            opacity: 0.8;
+            text-align: center;
+            max-width: 300px;
+            line-height: 1.4;
+            color: var(--albertsons-gray);
+        }
+
+        .attribution a {
+            color: var(--albertsons-blue);
+            text-decoration: underline;
+            font-weight: 500;
+        }
+
+        .attribution a:hover,
+        .attribution a:focus {
+            color: var(--albertsons-dark-blue);
+            text-decoration: none;
+            outline: 2px solid var(--albertsons-blue);
+            outline-offset: 2px;
+        }
+
+        /* Focus and accessibility improvements */
+        *:focus {
+            outline: var(--focus-outline);
+            outline-offset: 2px;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Skip link for keyboard users */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 6px;
+            background: var(--albertsons-blue);
+            color: var(--albertsons-white);
+            padding: 8px;
+            text-decoration: none;
+            border-radius: 4px;
+            z-index: 9999;
+            font-weight: 600;
+        }
+
+        .skip-link:focus {
+            top: 6px;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--albertsons-light-gray);
+            color: var(--albertsons-dark-gray);
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            font-size: 16px; /* Ensure minimum font size for accessibility */
+            line-height: 1.5; /* Improve readability */
+        }
+
+        #app {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #header {
+            background: var(--albertsons-blue);
+            padding: 12px 15px;
+            text-align: center;
+            z-index: 100;
+            box-shadow: 0 2px 4px rgba(0, 61, 165, 0.2);
+            flex-shrink: 0;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .logo-albertsons {
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--albertsons-white);
+            letter-spacing: -0.02em;
+        }
+
+        .logo-scanner {
+            font-size: 1.1rem;
+            font-weight: 400;
+            color: rgba(255, 255, 255, 0.9);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        #status {
+            font-size: 0.85rem;
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.8);
+            font-weight: 500;
+        }
+
+        .albertsons-logo {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .logo-text {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--albertsons-blue);
+            letter-spacing: -0.02em;
+            margin-bottom: 5px;
+        }
+
+        .logo-subtitle {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: var(--albertsons-gray);
+            letter-spacing: 0.1em;
+        }
+
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .empty-state-subtitle {
+            font-size: 0.9rem;
+            margin-top: 8px;
+            opacity: 0.8;
+            color: var(--albertsons-gray);
+        }
+
+        /* Improve button accessibility */
+        #start-btn {
+            padding: 16px 32px;
+            font-size: 1.1rem;
+            background: var(--albertsons-blue);
+            border: 3px solid var(--albertsons-blue);
+            color: var(--albertsons-white);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+            min-height: 48px;
+        }
+
+        #start-btn:hover,
+        #start-btn:focus {
+            background: var(--albertsons-dark-blue);
+            border-color: var(--albertsons-dark-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 61, 165, 0.3);
+        }
+
+        /* Improve control button accessibility */
+        .control-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
+            background: var(--albertsons-white);
+            box-shadow: 0 4px 12px rgba(0, 61, 165, 0.25);
+            border: 2px solid var(--albertsons-blue);
+            color: var(--albertsons-blue);
+            font-size: 22px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px; /* WCAG minimum touch target */
+            min-width: 48px;
+        }
+
+        .control-btn:hover,
+        .control-btn:focus {
+            background: var(--albertsons-blue);
+            color: var(--albertsons-white);
+            box-shadow: 0 6px 16px rgba(0, 61, 165, 0.4);
+            transform: scale(1.05);
+        }
+
+        .control-btn:active {
+            transform: scale(0.98);
+        }
+
+        #scanner-container {
+            position: relative;
+            height: 50vh;
+            overflow: hidden;
+            background: #000;
+            flex-shrink: 0;
+        }
+
+        #video {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #products-section {
+            height: 50vh;
+            background: var(--albertsons-white);
+            border-top: 3px solid var(--albertsons-blue);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #products-header {
+            background: var(--albertsons-light-gray);
+            padding: 12px 15px;
+            font-weight: 600;
+            font-size: 1rem;
+            color: var(--albertsons-dark-gray);
+            flex-shrink: 0;
+            border-bottom: 1px solid #E5E7EB;
+        }
+
+        #products-table-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: var(--albertsons-white);
+            border: 2px solid transparent; /* For focus indicator */
+        }
+
+        #products-table-container:focus {
+            border-color: var(--focus-color);
+            outline: none;
+        }
+
+        #products-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+            background: var(--albertsons-white);
+        }
+
+        #products-table thead {
+            background: var(--albertsons-blue);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        #products-table th {
+            padding: 14px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--albertsons-white);
+            border-bottom: 2px solid var(--albertsons-dark-blue);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        #products-table td {
+            padding: 16px 12px;
+            border-bottom: 1px solid #E5E7EB;
+            vertical-align: middle;
+        }
+
+        #products-table tbody tr {
+            transition: background-color 0.2s ease;
+        }
+
+        #products-table tbody tr:hover {
+            background: var(--albertsons-light-gray);
+        }
+
+        #products-table tbody tr:focus-within {
+            background: var(--albertsons-light-gray);
+            outline: 2px solid var(--focus-color);
+            outline-offset: -2px;
+        }
+
+        #products-table tbody tr:nth-child(even) {
+            background: #FAFBFC;
+        }
+
+        #products-table tbody tr:nth-child(even):hover,
+        #products-table tbody tr:nth-child(even):focus-within {
+            background: var(--albertsons-light-gray);
+        }
+
+        .product-image {
+            width: 32px;
+            height: 32px;
+            object-fit: cover;
+            border-radius: 6px;
+            display: block;
+            border: 1px solid #E5E7EB;
+        }
+
+        .product-name {
+            font-weight: 600;
+            color: var(--albertsons-dark-gray);
+            line-height: 1.3;
+            font-size: 0.95rem;
+        }
+
+        .product-brand {
+            color: var(--albertsons-gray);
+            font-size: 0.8rem;
+            margin-top: 2px;
+            font-weight: 500;
+        }
+
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, var(--albertsons-white) 0%, var(--albertsons-light-gray) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            text-align: center;
+        }
+
+        #start-screen p {
+            font-size: 1.1rem;
+            margin-bottom: 40px;
+            opacity: 0.8;
+            color: var(--albertsons-dark-gray);
+            font-weight: 400;
+            max-width: 280px;
+            line-height: 1.4;
+        }
+
+        #start-btn {
+            padding: 16px 32px;
+            font-size: 1.1rem;
+            background: var(--albertsons-white);
+            border: 2px solid var(--albertsons-white);
+            color: var(--albertsons-blue);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        #start-btn:hover {
+            background: transparent;
+            color: var(--albertsons-white);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .score-badge {
+            display: inline-block;
+            padding: 3px 7px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: white;
+            margin-right: 4px;
+            min-width: 24px;
+            text-align: center;
+            text-transform: uppercase;
+        }
+
+        .status-icon {
+            font-size: 1.2em;
+        }
+
+        .barcode-text {
+            font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
+            font-size: 0.8rem;
+            color: var(--albertsons-gray);
+            font-weight: 500;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--albertsons-gray);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 15px;
+            opacity: 0.4;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 30;
+        }
+
+        .control-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
+            background: var(--albertsons-white);
+            box-shadow: 0 4px 12px rgba(0, 61, 165, 0.25);
+            border: 2px solid var(--albertsons-blue);
+            color: var(--albertsons-blue);
+            font-size: 22px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        .control-btn:hover {
+            background: var(--albertsons-blue);
+            color: var(--albertsons-white);
+            box-shadow: 0 6px 16px rgba(0, 61, 165, 0.35);
+        }
+
+        .barcode-overlay {
+            position: absolute;
+            border: 3px solid var(--albertsons-green);
+            background: rgba(16, 185, 129, 0.15);
+            border-radius: 6px;
+            z-index: 20;
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+
+        .barcode-overlay.uncertain {
+            border-color: var(--albertsons-orange);
+            background: rgba(245, 158, 11, 0.15);
+        }
+
+        .barcode-label {
+            position: absolute;
+            background: var(--albertsons-blue);
+            color: var(--albertsons-white);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            white-space: nowrap;
+            z-index: 25;
+            pointer-events: none;
+            box-shadow: 0 2px 8px rgba(0, 61, 165, 0.4);
+        }
+
+        .barcode-label.uncertain {
+            background: var(--albertsons-orange);
+            color: var(--albertsons-white);
+        }
+
+        .barcode-label.loading {
+            background: var(--albertsons-orange);
+            color: var(--albertsons-white);
+            animation: pulse 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { opacity: 0.7; }
+            to { opacity: 1.0; }
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 30;
+        }
+
+        .control-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 28px;
+            background: var(--albertsons-white);
+            box-shadow: 0 4px 12px rgba(0, 61, 165, 0.25);
+            border: 2px solid var(--albertsons-blue);
+            color: var(--albertsons-blue);
+            font-size: 22px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .control-btn:active {
+            transform: scale(0.95);
+        }
+
+        .control-btn:hover {
+            background: var(--albertsons-blue);
+            color: var(--albertsons-white);
+            box-shadow: 0 6px 16px rgba(0, 61, 165, 0.35);
+        }
+
+        #start-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, var(--albertsons-white) 0%, var(--albertsons-light-gray) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            text-align: center;
+        }
+
+        #start-screen h2 {
+            font-size: 2rem;
+            margin-bottom: 20px;
+            color: var(--albertsons-blue);
+        }
+
+        #start-screen p {
+            font-size: 1rem;
+            margin-bottom: 30px;
+            opacity: 0.8;
+            color: var(--albertsons-dark-gray);
+        }
+
+        #start-btn {
+            padding: 15px 40px;
+            font-size: 1.1rem;
+            background: var(--albertsons-blue);
+            border: 2px solid var(--albertsons-blue);
+            color: var(--albertsons-white);
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        #start-btn:hover {
+            background: var(--albertsons-dark-blue);
+            border-color: var(--albertsons-dark-blue);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 61, 165, 0.3);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        @media (max-width: 480px) {
+            .logo-text {
+                font-size: 2.5rem;
+            }
+            
+            .logo-albertsons {
+                font-size: 1.1rem;
+            }
+            
+            .logo-scanner {
+                font-size: 0.95rem;
+            }
+            
+            #scanner-container {
+                height: 45vh;
+            }
+            
+            #products-section {
+                height: 55vh;
+            }
+            
+            .control-btn {
+                width: 52px;
+                height: 52px;
+                font-size: 18px;
+                min-width: 48px; /* Maintain WCAG touch target */
+                min-height: 48px;
+            }
+            
+            #products-table th,
+            #products-table td {
+                padding: 12px 8px;
+                font-size: 0.85rem;
+            }
+            
+            .product-image {
+                width: 28px;
+                height: 28px;
+            }
+            
+            .product-name {
+                font-size: 0.9rem;
+                line-height: 1.3;
+            }
+            
+            .score-badge {
+                font-size: 0.65rem;
+                padding: 2px 5px;
+            }
+            
+            /* Improve touch targets on mobile */
+            #start-btn {
+                font-size: 1rem;
+                padding: 18px 28px;
+                min-height: 50px;
+            }
+            
+            /* Ensure text is still readable on small screens */
+            body {
+                font-size: 15px;
+            }
+            
+            .attribution {
+                font-size: 0.85rem;
+                padding: 15px;
+                max-width: 280px;
+            }
+        }
+
+        /* High contrast mode support */
+        @media (prefers-contrast: high) {
+            :root {
+                --albertsons-gray: #000000;
+                --albertsons-dark-gray: #000000;
+            }
+            
+            .score-badge {
+                border: 1px solid #000000;
+            }
+            
+            #products-table td {
+                border-bottom: 2px solid #000000;
+            }
+        }
+
+        /* Reduce motion for users who prefer it */
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <div id="app" role="application" aria-label="Albertsons Barcode Scanner">
+        <div id="start-screen" role="dialog" aria-labelledby="app-title" aria-describedby="app-description">
+            <header class="albertsons-logo">
+                <h1 id="app-title" class="logo-text">Albertsons</h1>
+                <p class="logo-subtitle">BARCODE SCANNER</p>
+            </header>
+            <p id="app-description">Scan products to check prices, nutrition, and more</p>
+            <button id="start-btn" aria-label="Start camera for barcode scanning">Start Scanning</button>
+            <footer class="attribution">
+                🥫 Product data from <a href="https://openfoodfacts.org" target="_blank" rel="noopener" aria-label="Open Food Facts - opens in new tab">Open Food Facts</a> - the free, open database of food products
+            </footer>
+        </div>
+
+        <header id="header" role="banner">
+            <div class="header-logo">
+                <h2 class="logo-albertsons">Albertsons</h2>
+                <span class="logo-scanner">Scanner</span>
+            </div>
+            <div id="status" role="status" aria-live="polite" aria-atomic="true">Ready to scan products</div>
+        </header>
+
+        <main id="main-content" class="main-content">
+            <section id="scanner-container" aria-labelledby="scanner-heading">
+                <h3 id="scanner-heading" class="sr-only">Camera Scanner</h3>
+                <video id="video" playsinline aria-label="Camera feed for barcode scanning"></video>
+                <canvas id="overlay-canvas" role="img" aria-label="Barcode detection overlay"></canvas>
+                
+                <nav id="controls" role="toolbar" aria-label="Scanner controls">
+                    <button class="control-btn" id="toggle-flash" 
+                            title="Toggle camera flash" 
+                            aria-label="Toggle camera flash on or off">
+                        💡
+                    </button>
+                    <button class="control-btn" id="clear-btn" 
+                            title="Clear shopping list" 
+                            aria-label="Clear all scanned products from shopping list">
+                        🔄
+                    </button>
+                </nav>
+            </section>
+
+            <section id="products-section" aria-labelledby="products-heading">
+                <header id="products-header">
+                    <h3 id="products-heading">Shopping List (<span id="product-count" aria-live="polite">0</span> items)</h3>
+                </header>
+                <div id="products-table-container" role="region" aria-labelledby="products-heading" tabindex="0">
+                    <table id="products-table" role="table" aria-label="Scanned products list">
+                        <thead>
+                            <tr>
+                                <th scope="col" style="width: 40px;">Status</th>
+                                <th scope="col" style="width: 45px;">Image</th>
+                                <th scope="col">Product Details</th>
+                                <th scope="col" style="width: 80px;">Nutrition</th>
+                                <th scope="col" style="width: 90px;">UPC Code</th>
+                            </tr>
+                        </thead>
+                        <tbody id="products-tbody">
+                        </tbody>
+                    </table>
+                    
+                    <div id="empty-state" class="empty-state" role="status" aria-live="polite">
+                        <div class="empty-state-icon" aria-hidden="true">🛒</div>
+                        <p>Start scanning to build your shopping list</p>
+                        <p class="empty-state-subtitle">Point camera at product barcodes</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        class BarcodeScanner {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('overlay-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.status = document.getElementById('status');
+                this.productsTableBody = document.getElementById('products-tbody');
+                this.productCount = document.getElementById('product-count');
+                this.emptyState = document.getElementById('empty-state');
+                this.startScreen = document.getElementById('start-screen');
+                this.startBtn = document.getElementById('start-btn');
+                this.clearBtn = document.getElementById('clear-btn');
+                this.toggleFlashBtn = document.getElementById('toggle-flash');
+                
+                this.stream = null;
+                this.track = null;
+                this.useNativeAPI = false;
+                this.detectedBarcodes = new Map();
+                this.productCache = new Map();  // Cache API responses
+                this.overlayElements = [];
+                this.scanning = false;
+                this.flashEnabled = false;
+                
+                // Open Food Facts API configuration - no API key required!
+                this.API_BASE = 'https://world.openfoodfacts.org/api/v2/product';
+                this.pendingLookups = new Set();  // Track ongoing API calls
+                
+                this.init();
+            }
+
+            async init() {
+                // Check for native BarcodeDetector API
+                if ('BarcodeDetector' in window) {
+                    try {
+                        const formats = await BarcodeDetector.getSupportedFormats();
+                        if (formats.length > 0) {
+                            this.useNativeAPI = true;
+                            this.detector = new BarcodeDetector({ formats });
+                            console.log('Using native BarcodeDetector API');
+                        }
+                    } catch (err) {
+                        console.log('BarcodeDetector not available, falling back to QuaggaJS');
+                    }
+                }
+
+                // Event listeners
+                this.startBtn.addEventListener('click', () => this.startCamera());
+                this.clearBtn.addEventListener('click', () => this.clearDetections());
+                this.toggleFlashBtn.addEventListener('click', () => this.toggleFlash());
+                
+                // Handle resize
+                window.addEventListener('resize', () => this.resizeCanvas());
+                
+                // Keyboard navigation support
+                this.addKeyboardSupport();
+            }
+
+            addKeyboardSupport() {
+                // Allow keyboard navigation in table
+                document.addEventListener('keydown', (event) => {
+                    if (event.key === 'Escape' && this.scanning) {
+                        // Allow escape key to stop scanning (future feature)
+                        console.log('Escape key pressed during scanning');
+                    }
+                });
+                
+                // Make table container focusable with keyboard
+                const tableContainer = document.getElementById('products-table-container');
+                tableContainer.addEventListener('keydown', (event) => {
+                    if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                        // Future enhancement: keyboard navigation through products
+                        event.preventDefault();
+                    }
+                });
+            }
+
+            async checkPermission() {
+                // Check if we're on HTTPS or localhost
+                const isSecure = location.protocol === 'https:' || location.hostname === 'localhost';
+                if (!isSecure) {
+                    this.showPermissionHelp('This app requires HTTPS to access the camera. Please use HTTPS or localhost.');
+                    return false;
+                }
+
+                // Check if permissions API is available
+                if ('permissions' in navigator) {
+                    try {
+                        const result = await navigator.permissions.query({ name: 'camera' });
+                        console.log('Camera permission status:', result.state);
+                        
+                        if (result.state === 'denied') {
+                            this.showPermissionHelp('Camera access is blocked. Please check site settings and allow camera access.');
+                            return false;
+                        }
+                        
+                        // Listen for permission changes
+                        result.onchange = () => {
+                            console.log('Permission state changed to:', result.state);
+                            if (result.state === 'granted') {
+                                this.startCamera();
+                            }
+                        };
+                        
+                        return result.state === 'granted' || result.state === 'prompt';
+                    } catch (err) {
+                        console.log('Permission query failed:', err);
+                        // Continue anyway - some browsers don't support permission query
+                        return true;
+                    }
+                }
+                return true;
+            }
+
+            showPermissionHelp(message) {
+                this.status.textContent = 'Camera permission issue';
+                const helpDiv = document.createElement('div');
+                helpDiv.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0,0,0,0.9);
+                    color: white;
+                    padding: 20px;
+                    border-radius: 10px;
+                    max-width: 90%;
+                    z-index: 2000;
+                    text-align: left;
+                `;
+                helpDiv.innerHTML = `
+                    <h3 style="margin-top: 0;">Camera Permission Required</h3>
+                    <p>${message}</p>
+                    <h4>To fix on Chrome Android:</h4>
+                    <ol style="padding-left: 20px;">
+                        <li>Tap the <strong>lock icon</strong> in the address bar</li>
+                        <li>Tap <strong>Site settings</strong></li>
+                        <li>Tap <strong>Camera</strong></li>
+                        <li>Select <strong>Allow</strong></li>
+                        <li>Go back and <strong>refresh</strong> the page</li>
+                    </ol>
+                    <h4>Alternative:</h4>
+                    <p>Clear site data: Lock icon → Site settings → Clear & reset</p>
+                    <button id="close-help" style="
+                        background: #3498db;
+                        color: white;
+                        border: none;
+                        padding: 10px 20px;
+                        border-radius: 5px;
+                        margin-top: 10px;
+                        cursor: pointer;
+                    ">Close & Try Again</button>
+                `;
+                document.body.appendChild(helpDiv);
+                
+                document.getElementById('close-help').addEventListener('click', () => {
+                    document.body.removeChild(helpDiv);
+                    this.startScreen.classList.remove('hidden');
+                });
+            }
+
+            async startCamera() {
+                try {
+                    // First check permissions
+                    const canProceed = await this.checkPermission();
+                    if (!canProceed) {
+                        this.startScreen.classList.remove('hidden');
+                        return;
+                    }
+
+                    this.startScreen.classList.add('hidden');
+                    this.status.textContent = 'Accessing camera for product scanning...';
+                    
+                    // Add more specific constraints for Android Chrome
+                    const constraints = {
+                        video: {
+                            facingMode: { ideal: 'environment' },
+                            width: { ideal: 1920, min: 640 },
+                            height: { ideal: 1080, min: 480 }
+                        },
+                        audio: false  // Explicitly set audio to false
+                    };
+
+                    console.log('Requesting getUserMedia with constraints:', constraints);
+                    
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    console.log('Camera access granted!');
+                    
+                    this.video.srcObject = this.stream;
+                    this.track = this.stream.getVideoTracks()[0];
+                    
+                    // Check for torch capability
+                    const capabilities = this.track.getCapabilities();
+                    if (capabilities.torch) {
+                        this.toggleFlashBtn.style.display = 'flex';
+                    } else {
+                        this.toggleFlashBtn.style.display = 'none';
+                    }
+                    
+                    await this.video.play();
+                    
+                    this.resizeCanvas();
+                    this.scanning = true;
+                    this.status.textContent = 'Ready to scan products...';
+                    
+                    if (this.useNativeAPI) {
+                        this.scanWithNativeAPI();
+                    } else {
+                        this.initQuagga();
+                    }
+                } catch (err) {
+                    console.error('Error accessing camera:', err);
+                    console.error('Error name:', err.name);
+                    console.error('Error message:', err.message);
+                    
+                    this.startScreen.classList.remove('hidden');
+                    
+                    if (err.name === 'NotAllowedError') {
+                        this.showPermissionHelp('Camera access was denied. This usually means the permission was blocked at the browser or system level.');
+                    } else if (err.name === 'NotFoundError') {
+                        this.status.textContent = 'No camera found';
+                        alert('No camera device was found. Please ensure your device has a camera.');
+                    } else if (err.name === 'NotReadableError') {
+                        this.status.textContent = 'Camera in use';
+                        alert('Camera is already in use by another application. Please close other camera apps and try again.');
+                    } else if (err.name === 'OverconstrainedError') {
+                        // Try again with simpler constraints
+                        console.log('Constraints too strict, trying with basic constraints...');
+                        try {
+                            this.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                            this.video.srcObject = this.stream;
+                            await this.video.play();
+                            this.resizeCanvas();
+                            this.scanning = true;
+                            this.status.textContent = 'Scanning...';
+                            if (this.useNativeAPI) {
+                                this.scanWithNativeAPI();
+                            } else {
+                                this.initQuagga();
+                            }
+                        } catch (fallbackErr) {
+                            this.status.textContent = 'Camera access failed';
+                            alert('Unable to access camera. Error: ' + fallbackErr.message);
+                        }
+                    } else {
+                        this.status.textContent = 'Camera access failed';
+                        alert('Unable to access camera. Error: ' + err.message);
+                    }
+                }
+            }
+
+            async lookupProduct(barcode) {
+                // Check cache first
+                if (this.productCache.has(barcode)) {
+                    return this.productCache.get(barcode);
+                }
+
+                // Avoid duplicate API calls
+                if (this.pendingLookups.has(barcode)) {
+                    return null;
+                }
+
+                this.pendingLookups.add(barcode);
+
+                try {
+                    console.log(`Looking up product in Open Food Facts: ${barcode}`);
+                    
+                    const response = await fetch(`${this.API_BASE}/${barcode}`, {
+                        headers: {
+                            'Accept': 'application/json',
+                            'User-Agent': 'BarcodeScanner-PWA/1.0'
+                        }
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(`API Error: ${response.status}`);
+                    }
+
+                    const data = await response.json();
+                    
+                    // Check if product was found (Open Food Facts returns status)
+                    if (data.status === 1 && data.product) {
+                        const product = data.product;
+                        
+                        // Process the response based on Open Food Facts schema
+                        const productInfo = {
+                            barcode: barcode,
+                            title: product.product_name || product.product_name_en || 'Unknown Product',
+                            description: product.generic_name || '',
+                            brand: product.brands || '',
+                            category: this.parseCategory(product.categories || product.categories_tags),
+                            size: product.quantity || '',
+                            image: product.image_url || product.image_front_url || '',
+                            nutriscore: product.nutriscore_grade || '',
+                            ecoscore: product.ecoscore_grade || '',
+                            ingredients: product.ingredients_text || '',
+                            found: true,
+                            timestamp: Date.now(),
+                            source: 'Open Food Facts'
+                        };
+
+                        console.log('Product found:', productInfo);
+                        this.productCache.set(barcode, productInfo);
+                        return productInfo;
+                    } else {
+                        // Product not found in Open Food Facts
+                        throw new Error('Product not found');
+                    }
+
+                } catch (error) {
+                    console.error('Product lookup failed:', error);
+                    
+                    // Cache failed lookups to avoid repeated calls
+                    const failedProduct = {
+                        barcode: barcode,
+                        title: `Unknown Product (${barcode})`,
+                        description: 'Product not found in Open Food Facts database',
+                        brand: '',
+                        category: 'Unknown',
+                        size: '',
+                        image: '',
+                        nutriscore: '',
+                        ecoscore: '',
+                        ingredients: '',
+                        found: false,
+                        timestamp: Date.now(),
+                        source: 'Open Food Facts'
+                    };
+                    
+                    this.productCache.set(barcode, failedProduct);
+                    return failedProduct;
+                    
+                } finally {
+                    this.pendingLookups.delete(barcode);
+                }
+            }
+
+            parseCategory(categories) {
+                if (!categories) return 'Food';
+                
+                // Handle both string and array formats
+                let categoryStr = '';
+                if (typeof categories === 'string') {
+                    categoryStr = categories;
+                } else if (Array.isArray(categories)) {
+                    categoryStr = categories.join(', ');
+                }
+                
+                // Extract the most specific/relevant category
+                const categoryParts = categoryStr.split(',');
+                const cleanCategories = categoryParts
+                    .map(cat => cat.trim().replace(/^en:/, '').replace(/-/g, ' '))
+                    .filter(cat => cat && !cat.includes('food-products') && cat.length > 2);
+                
+                // Return the most specific category (usually the last one)
+                return cleanCategories.length > 0 ? 
+                    cleanCategories[cleanCategories.length - 1].charAt(0).toUpperCase() + 
+                    cleanCategories[cleanCategories.length - 1].slice(1) : 
+                    'Food';
+            }
+
+            async handleBarcodeDetection(barcode, format) {
+                const key = `${barcode}-${format}`;
+                
+                if (!this.detectedBarcodes.has(key)) {
+                    // Add basic barcode info immediately
+                    this.detectedBarcodes.set(key, {
+                        barcode: barcode,
+                        format: format,
+                        title: 'Looking up...',
+                        category: 'Loading...',
+                        timestamp: Date.now(),
+                        loading: true
+                    });
+                    
+                    this.updateDetectedList();
+                    
+                    // Look up product info asynchronously
+                    const productInfo = await this.lookupProduct(barcode);
+                    
+                    if (productInfo) {
+                        // Update with full product info
+                        this.detectedBarcodes.set(key, {
+                            ...productInfo,
+                            format: format,
+                            loading: false
+                        });
+                        
+                        this.updateDetectedList();
+                        
+                        // Show success feedback
+                        if (productInfo.found) {
+                            this.showTemporaryMessage(`✅ Found: ${productInfo.title}`);
+                        } else {
+                            this.showTemporaryMessage(`❌ Not in Open Food Facts: ${barcode}`);
+                        }
+                    }
+                }
+                
+                return this.detectedBarcodes.get(key);
+            }
+
+            showTemporaryMessage(message) {
+                const originalStatus = this.status.textContent;
+                this.status.textContent = message;
+                this.status.style.color = '#00ff00';
+                
+                setTimeout(() => {
+                    this.status.textContent = originalStatus;
+                    this.status.style.color = '#3498db';
+                }, 3000);
+            }
+
+            resizeCanvas() {
+                const scannerContainer = document.getElementById('scanner-container');
+                const rect = scannerContainer.getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+            }
+
+            async scanWithNativeAPI() {
+                if (!this.scanning) return;
+
+                try {
+                    const barcodes = await this.detector.detect(this.video);
+                    this.clearOverlays();
+                    
+                    for (const barcode of barcodes) {
+                        // Handle barcode detection with API lookup
+                        const productData = await this.handleBarcodeDetection(barcode.rawValue, barcode.format);
+                        
+                        // Draw overlay with product info if available
+                        this.drawBarcodeOverlay(barcode, productData);
+                    }
+                } catch (err) {
+                    console.error('Scanning error:', err);
+                }
+
+                if (this.scanning) {
+                    requestAnimationFrame(() => this.scanWithNativeAPI());
+                }
+            }
+
+            initQuagga() {
+                const scanArea = document.getElementById('scanner-container');
+                
+                Quagga.init({
+                    inputStream: {
+                        name: "Live",
+                        type: "LiveStream",
+                        target: this.video,
+                        constraints: {
+                            facingMode: "environment"
+                        }
+                    },
+                    locator: {
+                        patchSize: "medium",
+                        halfSample: true
+                    },
+                    numOfWorkers: navigator.hardwareConcurrency || 4,
+                    frequency: 10,
+                    decoder: {
+                        readers: [
+                            "code_128_reader",
+                            "ean_reader",
+                            "ean_8_reader",
+                            "code_39_reader",
+                            "code_39_vin_reader",
+                            "codabar_reader",
+                            "upc_reader",
+                            "upc_e_reader",
+                            "i2of5_reader"
+                        ]
+                    },
+                    locate: true
+                }, (err) => {
+                    if (err) {
+                        console.error('Quagga init error:', err);
+                        this.status.textContent = 'Scanner initialization failed';
+                        return;
+                    }
+                    Quagga.start();
+                });
+
+                Quagga.onDetected(async (result) => {
+                    const code = result.codeResult.code;
+                    const format = result.codeResult.format;
+                    
+                    // Handle barcode detection with API lookup
+                    const productData = await this.handleBarcodeDetection(code, format);
+                    
+                    // Draw overlay will be handled in onProcessed
+                });
+
+                Quagga.onProcessed((result) => {
+                    this.clearOverlays();
+                    
+                    if (result && result.boxes) {
+                        result.boxes.filter(box => box !== result.box).forEach(box => {
+                            this.drawBox(box, 'uncertain');
+                        });
+                        
+                        if (result.box && result.codeResult && result.codeResult.code) {
+                            const code = result.codeResult.code;
+                            const format = result.codeResult.format;
+                            const key = `${code}-${format}`;
+                            const productData = this.detectedBarcodes.get(key);
+                            
+                            // Draw box for detected barcode
+                            this.drawBox(result.box, 'detected');
+                            
+                            // Add label with product info if available
+                            const labelText = productData && !productData.loading ? 
+                                productData.title :
+                                (productData?.loading ? 'Looking up...' : code);
+                            
+                            const category = productData?.category || format;
+                            
+                            const label = this.createLabel(
+                                labelText,
+                                category,
+                                result.box[0][0] * (this.canvas.width / this.video.videoWidth),
+                                result.box[0][1] * (this.canvas.height / this.video.videoHeight) - 10,
+                                false,
+                                productData?.loading || false
+                            );
+                            this.overlayElements.push(label);
+                        } else if (result.box) {
+                            this.drawBox(result.box, 'detected');
+                        }
+                    }
+                });
+            }
+
+            drawBarcodeOverlay(barcode, productData = null) {
+                const { cornerPoints, boundingBox } = barcode;
+                const rect = this.video.getBoundingClientRect();
+                
+                // Draw on canvas
+                this.ctx.strokeStyle = '#00ff00';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                
+                if (cornerPoints && cornerPoints.length > 0) {
+                    const scaleX = this.canvas.width / this.video.videoWidth;
+                    const scaleY = this.canvas.height / this.video.videoHeight;
+                    
+                    cornerPoints.forEach((point, i) => {
+                        const x = point.x * scaleX;
+                        const y = point.y * scaleY;
+                        if (i === 0) {
+                            this.ctx.moveTo(x, y);
+                        } else {
+                            this.ctx.lineTo(x, y);
+                        }
+                    });
+                    this.ctx.closePath();
+                    this.ctx.stroke();
+                    
+                    // Add label with product info if available
+                    const labelText = productData && !productData.loading ? 
+                        productData.title :
+                        (productData?.loading ? 'Looking up...' : barcode.rawValue);
+                    
+                    const category = productData?.category || barcode.format;
+                    
+                    const label = this.createLabel(
+                        labelText,
+                        category,
+                        cornerPoints[0].x * scaleX,
+                        cornerPoints[0].y * scaleY - 10,
+                        false,
+                        productData?.loading || false
+                    );
+                    this.overlayElements.push(label);
+                }
+            }
+
+            drawQuaggaOverlay(result) {
+                const code = result.codeResult.code;
+                const format = result.codeResult.format;
+                const box = result.box;
+                
+                if (box && box.length >= 2) {
+                    const rect = this.video.getBoundingClientRect();
+                    const scaleX = rect.width / this.video.videoWidth;
+                    const scaleY = rect.height / this.video.videoHeight;
+                    
+                    // Draw box
+                    this.ctx.strokeStyle = '#00ff00';
+                    this.ctx.lineWidth = 3;
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(box[0][0] * scaleX, box[0][1] * scaleY);
+                    box.forEach(point => {
+                        this.ctx.lineTo(point[0] * scaleX, point[1] * scaleY);
+                    });
+                    this.ctx.closePath();
+                    this.ctx.stroke();
+                    
+                    // Add label
+                    const label = this.createLabel(
+                        code,
+                        format,
+                        box[0][0] * scaleX,
+                        box[0][1] * scaleY - 10
+                    );
+                    this.overlayElements.push(label);
+                }
+            }
+
+            drawBox(box, type) {
+                if (!box || box.length < 2) return;
+                
+                const rect = this.video.getBoundingClientRect();
+                const scaleX = rect.width / this.video.videoWidth;
+                const scaleY = rect.height / this.video.videoHeight;
+                
+                this.ctx.strokeStyle = type === 'uncertain' ? '#ffa500' : '#00ff00';
+                this.ctx.lineWidth = type === 'uncertain' ? 2 : 3;
+                this.ctx.setLineDash(type === 'uncertain' ? [5, 5] : []);
+                
+                this.ctx.beginPath();
+                this.ctx.moveTo(box[0][0] * scaleX, box[0][1] * scaleY);
+                box.forEach(point => {
+                    this.ctx.lineTo(point[0] * scaleX, point[1] * scaleY);
+                });
+                this.ctx.closePath();
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+                
+                if (type === 'uncertain') {
+                    const label = this.createLabel(
+                        'Possible barcode?',
+                        '',
+                        box[0][0] * scaleX,
+                        box[0][1] * scaleY - 10,
+                        true
+                    );
+                    this.overlayElements.push(label);
+                }
+            }
+
+            createLabel(value, category, x, y, uncertain = false, loading = false) {
+                const label = document.createElement('div');
+                label.className = `barcode-label ${uncertain ? 'uncertain' : ''} ${loading ? 'loading' : ''}`;
+                
+                if (loading) {
+                    label.innerHTML = '<div style="color: #ffa500;">🔍 Looking up...</div>';
+                } else if (category && !uncertain && category !== value) {
+                    label.innerHTML = `
+                        <div style="font-weight: bold; font-size: 0.9em;">${value}</div>
+                        <div style="font-size: 0.75em; opacity: 0.8; margin-top: 2px;">${category}</div>
+                    `;
+                } else {
+                    label.textContent = uncertain ? value : `${value}`;
+                }
+                
+                label.style.left = `${x}px`;
+                label.style.top = `${y}px`;
+                document.getElementById('scanner-container').appendChild(label);
+                return label;
+            }
+
+            clearOverlays() {
+                // Clear canvas
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                // Remove DOM overlay elements
+                this.overlayElements.forEach(el => {
+                    if (el && el.parentNode) {
+                        el.parentNode.removeChild(el);
+                    }
+                });
+                this.overlayElements = [];
+            }
+
+            updateDetectedList() {
+                const productCount = this.detectedBarcodes.size;
+                this.productCount.textContent = productCount;
+                
+                if (productCount === 0) {
+                    this.emptyState.style.display = 'block';
+                    this.productsTableBody.innerHTML = '';
+                    return;
+                }
+                
+                this.emptyState.style.display = 'none';
+                this.productsTableBody.innerHTML = '';
+                
+                this.detectedBarcodes.forEach((data, key, index = 0) => {
+                    const row = document.createElement('tr');
+                    row.setAttribute('role', 'row');
+                    row.setAttribute('aria-rowindex', index + 2); // +2 because header is row 1
+                    
+                    if (data.loading) {
+                        row.innerHTML = `
+                            <td role="gridcell" aria-describedby="status-${index}">
+                                <span class="status-icon" aria-hidden="true">🔍</span>
+                                <span id="status-${index}" class="sr-only">Product lookup in progress</span>
+                            </td>
+                            <td role="gridcell"><span class="sr-only">No image available</span></td>
+                            <td role="gridcell">
+                                <div class="product-name" aria-label="Product being looked up">Looking up...</div>
+                                <div class="barcode-text" aria-label="Barcode number ${data.barcode}">${data.barcode}</div>
+                            </td>
+                            <td role="gridcell">
+                                <span style="color: var(--albertsons-orange); font-size: 0.9rem;" aria-label="Nutritional information loading">Loading...</span>
+                            </td>
+                            <td role="gridcell">
+                                <span class="barcode-text" aria-label="Barcode format ${data.format}">${data.format}</span>
+                            </td>
+                        `;
+                    } else {
+                        const statusIcon = data.found ? '✅' : '❌';
+                        const statusText = data.found ? 'Product found in database' : 'Product not found in database';
+                        const titleDisplay = data.title || `Unknown Product`;
+                        
+                        // Create scores column with proper accessibility
+                        let scoresHtml = '';
+                        let scoresAriaLabel = '';
+                        if (data.found) {
+                            if (data.nutriscore) {
+                                const nutriColor = this.getNutriScoreColor(data.nutriscore);
+                                scoresHtml += `<div class="score-badge" style="background: ${nutriColor};" 
+                                              aria-label="Nutri-Score ${data.nutriscore.toUpperCase()}">N:${data.nutriscore.toUpperCase()}</div>`;
+                                scoresAriaLabel += `Nutri-Score ${data.nutriscore.toUpperCase()}. `;
+                            }
+                            if (data.ecoscore) {
+                                const ecoColor = this.getEcoScoreColor(data.ecoscore);
+                                scoresHtml += `<div class="score-badge" style="background: ${ecoColor};" 
+                                              aria-label="Eco-Score ${data.ecoscore.toUpperCase()}">E:${data.ecoscore.toUpperCase()}</div>`;
+                                scoresAriaLabel += `Eco-Score ${data.ecoscore.toUpperCase()}.`;
+                            }
+                        } else {
+                            scoresHtml = '<span style="color: var(--albertsons-gray); font-size: 0.9rem;" aria-label="No nutritional scores available">N/A</span>';
+                            scoresAriaLabel = 'No nutritional scores available';
+                        }
+                        
+                        row.innerHTML = `
+                            <td role="gridcell" aria-describedby="status-${index}">
+                                <span class="status-icon" aria-hidden="true">${statusIcon}</span>
+                                <span id="status-${index}" class="sr-only">${statusText}</span>
+                            </td>
+                            <td role="gridcell">
+                                ${data.image ? 
+                                    `<img src="${data.image}" class="product-image" alt="Product image for ${titleDisplay}" onerror="this.style.display='none'">` : 
+                                    '<div style="width: 32px; height: 32px; background: #E5E7EB; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.8rem;" aria-label="No product image available">📦</div>'
+                                }
+                            </td>
+                            <td role="gridcell">
+                                <div class="product-name" aria-label="Product name: ${titleDisplay}">${titleDisplay}</div>
+                                ${data.brand ? `<div class="product-brand" aria-label="Brand: ${data.brand}">${data.brand}</div>` : ''}
+                                <div style="font-size: 0.8rem; color: var(--albertsons-gray); margin-top: 4px;" aria-label="Category: ${data.category}${data.size ? `, Size: ${data.size}` : ''}">
+                                    ${data.category}${data.size ? ` • ${data.size}` : ''}
+                                </div>
+                            </td>
+                            <td role="gridcell" aria-label="${scoresAriaLabel}">${scoresHtml}</td>
+                            <td role="gridcell">
+                                <span class="barcode-text" aria-label="UPC Code ${data.barcode}, Format ${data.format}">
+                                    ${data.barcode}<br><span style="font-size: 0.75rem;">${data.format}</span>
+                                </span>
+                            </td>
+                        `;
+                    }
+                    
+                    this.productsTableBody.appendChild(row);
+                    index++;
+                });
+                
+                // Auto-scroll to the latest item
+                const tableContainer = document.getElementById('products-table-container');
+                tableContainer.scrollTop = tableContainer.scrollHeight;
+                
+                // Announce to screen readers
+                this.announceProductCount(productCount);
+            }
+
+            announceProductCount(count) {
+                // Create a live region announcement for screen readers
+                const announcement = document.createElement('div');
+                announcement.setAttribute('aria-live', 'polite');
+                announcement.setAttribute('aria-atomic', 'true');
+                announcement.className = 'sr-only';
+                announcement.textContent = `Shopping list updated. ${count} product${count !== 1 ? 's' : ''} scanned.`;
+                document.body.appendChild(announcement);
+                
+                // Remove after announcement
+                setTimeout(() => {
+                    document.body.removeChild(announcement);
+                }, 1000);
+            }
+
+            getNutriScoreColor(score) {
+                const colors = {
+                    'a': '#038141',
+                    'b': '#85bb2f', 
+                    'c': '#fecb00',
+                    'd': '#ee8100',
+                    'e': '#e63312'
+                };
+                return colors[score.toLowerCase()] || '#666';
+            }
+
+            getEcoScoreColor(score) {
+                const colors = {
+                    'a': '#038141',
+                    'b': '#85bb2f',
+                    'c': '#fecb00', 
+                    'd': '#ee8100',
+                    'e': '#e63312'
+                };
+                return colors[score.toLowerCase()] || '#666';
+            }
+
+            clearDetections() {
+                this.detectedBarcodes.clear();
+                this.productCache.clear();  // Clear cached API responses
+                this.pendingLookups.clear(); // Clear pending lookups
+                this.clearOverlays();
+                this.updateDetectedList();
+                this.status.textContent = 'Shopping list cleared';
+                setTimeout(() => {
+                    this.status.textContent = this.useNativeAPI ? 
+                        'Scanning (Native API)...' : 
+                        'Scanning (QuaggaJS)...';
+                }, 1500);
+            }
+
+            async toggleFlash() {
+                if (!this.track) return;
+                
+                try {
+                    this.flashEnabled = !this.flashEnabled;
+                    await this.track.applyConstraints({
+                        advanced: [{ torch: this.flashEnabled }]
+                    });
+                    this.toggleFlashBtn.style.background = this.flashEnabled ? 
+                        'rgba(255, 255, 0, 0.3)' : 
+                        'rgba(255, 255, 255, 0.2)';
+                } catch (err) {
+                    console.error('Error toggling flash:', err);
+                }
+            }
+
+            stop() {
+                this.scanning = false;
+                
+                if (!this.useNativeAPI && typeof Quagga !== 'undefined') {
+                    Quagga.stop();
+                }
+                
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                }
+                
+                this.clearOverlays();
+            }
+        }
+
+        // Initialize scanner when page loads
+        let scanner;
+        window.addEventListener('DOMContentLoaded', () => {
+            scanner = new BarcodeScanner();
+        });
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', () => {
+            if (scanner) {
+                scanner.stop();
+            }
+        });
+
+        // PWA install prompt
+        let deferredPrompt;
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+        });
+
+        // Service worker registration (for full PWA functionality)
+        if ('serviceWorker' in navigator) {
+            // You would need to create a separate service worker file for full PWA functionality
+            console.log('Service Worker support detected');
+        }
+    </script>
+</body>
+</html>
