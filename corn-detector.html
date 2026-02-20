@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#D97706">
+    <meta name="description" content="Scan product barcodes to detect corn and corn-derived ingredients hiding in your food.">
+    <title>🌽 Corn Detector - Find Hidden Corn in Your Food</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    
+    <style>
+        :root {
+            --corn-yellow: #EAB308;
+            --corn-gold: #D97706;
+            --corn-dark-gold: #B45309;
+            --corn-light-yellow: #FEF9C3;
+            --corn-cream: #FFFBEB;
+            --corn-green: #16A34A;
+            --corn-dark-green: #15803D;
+            --corn-husk: #65A30D;
+            --corn-white: #FFFFFF;
+            --corn-light-bg: #FEFCE8;
+            --corn-text: #422006;
+            --corn-text-secondary: #713F12;
+            --corn-red: #DC2626;
+            --corn-safe-green: #059669;
+            --corn-border: #FDE68A;
+            
+            --focus-color: #D97706;
+            --focus-outline: 3px solid var(--focus-color);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        *:focus { outline: var(--focus-outline); outline-offset: 2px; }
+
+        .sr-only {
+            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+            overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: var(--corn-light-bg);
+            color: var(--corn-text);
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+
+        #app {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== HEADER ===== */
+        #header {
+            background: linear-gradient(135deg, var(--corn-gold) 0%, var(--corn-dark-gold) 100%);
+            padding: 10px 15px;
+            text-align: center;
+            z-index: 100;
+            box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+            flex-shrink: 0;
+        }
+
+        .header-logo {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+
+        .logo-corn { font-size: 1.3rem; }
+        
+        .logo-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--corn-white);
+            letter-spacing: -0.01em;
+        }
+
+        .logo-subtitle {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.9);
+            letter-spacing: 0.03em;
+        }
+
+        #status {
+            font-size: 0.8rem;
+            margin-top: 2px;
+            color: rgba(255, 255, 255, 0.85);
+            font-weight: 500;
+        }
+
+        /* ===== START SCREEN ===== */
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(160deg, var(--corn-cream) 0%, var(--corn-light-yellow) 40%, var(--corn-light-bg) 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .start-logo-icon {
+            font-size: 5rem;
+            margin-bottom: 10px;
+            animation: corn-bounce 2s ease-in-out infinite;
+        }
+
+        @keyframes corn-bounce {
+            0%, 100% { transform: translateY(0) rotate(-5deg); }
+            50% { transform: translateY(-8px) rotate(5deg); }
+        }
+
+        .start-title {
+            font-size: 2.4rem;
+            font-weight: 800;
+            color: var(--corn-dark-gold);
+            letter-spacing: -0.02em;
+            margin-bottom: 4px;
+        }
+
+        .start-tagline {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--corn-text-secondary);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 20px;
+        }
+
+        #start-screen p {
+            font-size: 1rem;
+            margin-bottom: 30px;
+            color: var(--corn-text-secondary);
+            max-width: 300px;
+            line-height: 1.5;
+        }
+
+        #start-btn {
+            padding: 16px 36px;
+            font-size: 1.1rem;
+            background: linear-gradient(135deg, var(--corn-gold) 0%, var(--corn-dark-gold) 100%);
+            border: none;
+            color: var(--corn-white);
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            box-shadow: 0 4px 15px rgba(217, 119, 6, 0.35);
+            min-height: 48px;
+        }
+
+        #start-btn:hover, #start-btn:focus {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(217, 119, 6, 0.45);
+        }
+
+        .attribution {
+            margin-top: 30px;
+            padding: 15px;
+            background: rgba(217, 119, 6, 0.06);
+            border: 1px solid rgba(217, 119, 6, 0.15);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            text-align: center;
+            max-width: 300px;
+            line-height: 1.4;
+            color: var(--corn-text-secondary);
+        }
+
+        .attribution a {
+            color: var(--corn-dark-gold);
+            text-decoration: underline;
+            font-weight: 600;
+        }
+
+        /* ===== SCANNER ===== */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        #scanner-container {
+            position: relative;
+            height: 45vh;
+            overflow: hidden;
+            background: #000;
+            flex-shrink: 0;
+        }
+
+        #video {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #overlay-canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #controls {
+            position: absolute;
+            bottom: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            z-index: 30;
+        }
+
+        .control-btn {
+            width: 52px;
+            height: 52px;
+            border-radius: 26px;
+            background: var(--corn-white);
+            box-shadow: 0 4px 12px rgba(180, 83, 9, 0.3);
+            border: 2px solid var(--corn-gold);
+            color: var(--corn-dark-gold);
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 48px;
+            min-width: 48px;
+        }
+
+        .control-btn:hover, .control-btn:focus {
+            background: var(--corn-gold);
+            color: var(--corn-white);
+            box-shadow: 0 6px 16px rgba(180, 83, 9, 0.4);
+        }
+
+        .control-btn:active { transform: scale(0.95); }
+
+        /* ===== RESULTS SECTION ===== */
+        #products-section {
+            height: 55vh;
+            background: var(--corn-white);
+            border-top: 3px solid var(--corn-gold);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        #products-header {
+            background: var(--corn-light-yellow);
+            padding: 10px 15px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            color: var(--corn-text);
+            flex-shrink: 0;
+            border-bottom: 1px solid var(--corn-border);
+        }
+
+        #products-table-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            background: var(--corn-white);
+        }
+
+        /* ===== PRODUCT CARDS (replacing table for cleaner mobile UI) ===== */
+        .product-card {
+            padding: 14px 16px;
+            border-bottom: 1px solid #FDE68A;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            transition: background 0.2s;
+        }
+
+        .product-card:nth-child(even) { background: #FFFBEB; }
+        .product-card:hover { background: var(--corn-light-yellow); }
+
+        .product-card .verdict-icon {
+            font-size: 2rem;
+            flex-shrink: 0;
+            width: 44px;
+            text-align: center;
+            padding-top: 2px;
+        }
+
+        .product-card .product-info { flex: 1; min-width: 0; }
+
+        .product-card .product-name {
+            font-weight: 700;
+            color: var(--corn-text);
+            font-size: 0.95rem;
+            line-height: 1.3;
+            word-break: break-word;
+        }
+
+        .product-card .product-brand {
+            font-size: 0.8rem;
+            color: var(--corn-text-secondary);
+            margin-top: 1px;
+        }
+
+        .product-card .barcode-num {
+            font-size: 0.75rem;
+            color: #92400E;
+            font-family: 'SF Mono', Monaco, Consolas, monospace;
+            margin-top: 3px;
+        }
+
+        .verdict-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            margin-top: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+
+        .verdict-badge.corn-found {
+            background: #FEF2F2;
+            color: #991B1B;
+            border: 1.5px solid #FECACA;
+        }
+
+        .verdict-badge.corn-free {
+            background: #F0FDF4;
+            color: #166534;
+            border: 1.5px solid #BBF7D0;
+        }
+
+        .verdict-badge.unknown {
+            background: #F5F5F4;
+            color: #57534E;
+            border: 1.5px solid #D6D3D1;
+        }
+
+        .verdict-badge.loading {
+            background: var(--corn-light-yellow);
+            color: var(--corn-dark-gold);
+            border: 1.5px solid var(--corn-border);
+            animation: pulse 1.5s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { opacity: 0.6; }
+            to { opacity: 1.0; }
+        }
+
+        .offending-list {
+            margin-top: 6px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .offending-chip {
+            display: inline-block;
+            background: #FEF2F2;
+            color: #991B1B;
+            border: 1px solid #FECACA;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.72rem;
+            font-weight: 600;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--corn-text-secondary);
+        }
+
+        .empty-state-icon {
+            font-size: 3.5rem;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .empty-state p { font-size: 0.95rem; }
+
+        .empty-state-subtitle {
+            font-size: 0.85rem;
+            margin-top: 6px;
+            opacity: 0.7;
+        }
+
+        /* Barcode overlay labels */
+        .barcode-label {
+            position: absolute;
+            background: var(--corn-gold);
+            color: var(--corn-white);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            white-space: nowrap;
+            z-index: 25;
+            pointer-events: none;
+            box-shadow: 0 2px 8px rgba(180, 83, 9, 0.4);
+        }
+
+        .barcode-label.uncertain {
+            background: #92400E;
+        }
+
+        .barcode-label.loading {
+            background: #92400E;
+            animation: pulse 1.5s ease-in-out infinite alternate;
+        }
+
+        .barcode-overlay { pointer-events: none; }
+
+        .hidden { display: none !important; }
+
+        /* ===== MANUAL ENTRY ===== */
+        .manual-entry {
+            display: flex;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--corn-cream);
+            border-bottom: 1px solid var(--corn-border);
+            flex-shrink: 0;
+        }
+
+        .manual-entry input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 2px solid var(--corn-border);
+            border-radius: 8px;
+            font-size: 0.9rem;
+            background: var(--corn-white);
+            color: var(--corn-text);
+            min-height: 40px;
+        }
+
+        .manual-entry input:focus {
+            border-color: var(--corn-gold);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(234, 179, 8, 0.2);
+        }
+
+        .manual-entry button {
+            padding: 8px 16px;
+            background: var(--corn-gold);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            cursor: pointer;
+            min-height: 40px;
+            white-space: nowrap;
+        }
+
+        .manual-entry button:hover { background: var(--corn-dark-gold); }
+
+        /* ===== STATS BAR ===== */
+        .stats-bar {
+            display: flex;
+            gap: 0;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-align: center;
+            flex-shrink: 0;
+            border-bottom: 1px solid var(--corn-border);
+        }
+
+        .stat-item {
+            flex: 1;
+            padding: 6px 4px;
+        }
+
+        .stat-item.stat-total {
+            background: var(--corn-light-yellow);
+            color: var(--corn-text);
+        }
+
+        .stat-item.stat-corny {
+            background: #FEF2F2;
+            color: #991B1B;
+        }
+
+        .stat-item.stat-safe {
+            background: #F0FDF4;
+            color: #166534;
+        }
+
+        .stat-num {
+            font-size: 1.3rem;
+            display: block;
+            line-height: 1.2;
+        }
+
+        /* ===== RESPONSIVE ===== */
+        @media (max-width: 480px) {
+            .start-title { font-size: 2rem; }
+            .start-logo-icon { font-size: 4rem; }
+            #scanner-container { height: 40vh; }
+            #products-section { height: 60vh; }
+            .control-btn { width: 48px; height: 48px; font-size: 18px; }
+            .product-card { padding: 12px 12px; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+
+        @media (prefers-contrast: high) {
+            :root {
+                --corn-text-secondary: #000000;
+            }
+            .verdict-badge { border-width: 2px; }
+        }
+    </style>
+</head>
+<body>
+    <a href="#main-content" class="sr-only" style="position:absolute;top:-40px;left:6px;background:var(--corn-gold);color:white;padding:8px;z-index:9999;">Skip to main content</a>
+
+    <div id="app" role="application" aria-label="Corn Detector Scanner">
+        
+        <!-- ===== START SCREEN ===== -->
+        <div id="start-screen" role="dialog" aria-labelledby="app-title" aria-describedby="app-description">
+            <div class="start-logo-icon" aria-hidden="true">🌽</div>
+            <h1 id="app-title" class="start-title">Corn Detector</h1>
+            <p class="start-tagline">Is There Corn In That?</p>
+            <p id="app-description">Scan any barcode to find hidden corn &amp; corn-derived ingredients lurking in your food</p>
+            <button id="start-btn" aria-label="Start camera for barcode scanning">Start Scanning</button>
+            <footer class="attribution">
+                🥫 Ingredient data from <a href="https://openfoodfacts.org" target="_blank" rel="noopener">Open Food Facts</a> — the free, open database of food products
+            </footer>
+        </div>
+
+        <!-- ===== HEADER ===== -->
+        <header id="header" role="banner">
+            <div class="header-logo">
+                <span class="logo-corn" aria-hidden="true">🌽</span>
+                <span class="logo-title">Corn Detector</span>
+            </div>
+            <div id="status" role="status" aria-live="polite" aria-atomic="true">Ready to scan</div>
+        </header>
+
+        <!-- ===== MAIN ===== -->
+        <main id="main-content" class="main-content">
+            <section id="scanner-container" aria-labelledby="scanner-heading">
+                <h2 id="scanner-heading" class="sr-only">Camera Scanner</h2>
+                <video id="video" playsinline aria-label="Camera feed for barcode scanning"></video>
+                <canvas id="overlay-canvas" role="img" aria-label="Barcode detection overlay"></canvas>
+                
+                <nav id="controls" role="toolbar" aria-label="Scanner controls">
+                    <button class="control-btn" id="toggle-flash" title="Toggle flash" aria-label="Toggle camera flash">💡</button>
+                    <button class="control-btn" id="clear-btn" title="Clear list" aria-label="Clear all scanned products">🔄</button>
+                </nav>
+            </section>
+
+            <section id="products-section" aria-labelledby="products-heading">
+                <header id="products-header">
+                    <h3 id="products-heading">🌽 Scan Results (<span id="product-count">0</span> scanned)</h3>
+                </header>
+
+                <!-- Manual barcode entry -->
+                <div class="manual-entry">
+                    <input type="text" id="manual-barcode" placeholder="Or type a barcode..." inputmode="numeric" pattern="[0-9]*" aria-label="Enter barcode manually">
+                    <button id="manual-lookup-btn" aria-label="Look up barcode">Look Up</button>
+                </div>
+
+                <!-- Stats bar -->
+                <div class="stats-bar" id="stats-bar" style="display:none;">
+                    <div class="stat-item stat-total">
+                        <span class="stat-num" id="stat-total">0</span>
+                        Scanned
+                    </div>
+                    <div class="stat-item stat-corny">
+                        <span class="stat-num" id="stat-corny">0</span>
+                        🌽 Corn Found
+                    </div>
+                    <div class="stat-item stat-safe">
+                        <span class="stat-num" id="stat-safe">0</span>
+                        ✅ Corn Free
+                    </div>
+                </div>
+
+                <div id="products-list-container" role="region" aria-labelledby="products-heading" tabindex="0">
+                    <div id="products-list"></div>
+                    
+                    <div id="empty-state" class="empty-state" role="status" aria-live="polite">
+                        <div class="empty-state-icon" aria-hidden="true">🔍</div>
+                        <p>Scan a barcode to check for corn</p>
+                        <p class="empty-state-subtitle">Point your camera at a product or type a barcode above</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // ================================================================
+        // CORN & CORN-DERIVED INGREDIENT DATABASE
+        // ================================================================
+        // This is the core of the detector. Each entry is a term to search
+        // for in the ingredients list (case-insensitive). We also keep a
+        // human-friendly label so we can show WHY something was flagged.
+        //
+        // Sources for this list: typical corn allergy / corn-free diet
+        // reference guides. Grouped by category for readability.
+        // ================================================================
+
+        const CORN_INGREDIENTS = [
+            // Direct corn
+            { term: 'corn',             label: 'Corn' },
+            { term: 'maize',            label: 'Maize' },
+            { term: 'hominy',           label: 'Hominy' },
+            { term: 'polenta',          label: 'Polenta' },
+            { term: 'grits',            label: 'Grits' },
+            { term: 'masa',             label: 'Masa' },
+            { term: 'popcorn',          label: 'Popcorn' },
+
+            // Corn starches & flours
+            { term: 'cornstarch',       label: 'Cornstarch' },
+            { term: 'corn starch',      label: 'Corn Starch' },
+            { term: 'cornflour',        label: 'Corn Flour' },
+            { term: 'corn flour',       label: 'Corn Flour' },
+            { term: 'cornmeal',         label: 'Cornmeal' },
+            { term: 'corn meal',        label: 'Cornmeal' },
+            { term: 'corn bran',        label: 'Corn Bran' },
+            { term: 'corn germ',        label: 'Corn Germ' },
+            { term: 'corn gluten',      label: 'Corn Gluten' },
+            { term: 'corn fiber',       label: 'Corn Fiber' },
+            { term: 'corn fibre',       label: 'Corn Fibre' },
+            { term: 'zein',             label: 'Zein (corn protein)' },
+            { term: 'zeaxanthin',       label: 'Zeaxanthin (corn-derived)' },
+
+            // Corn syrups & sugars
+            { term: 'corn syrup',       label: 'Corn Syrup' },
+            { term: 'high fructose',    label: 'High Fructose Corn Syrup' },
+            { term: 'hfcs',             label: 'HFCS (Corn Syrup)' },
+            { term: 'glucose syrup',    label: 'Glucose Syrup (likely corn)' },
+            { term: 'glucose-fructose', label: 'Glucose-Fructose (likely corn)' },
+            { term: 'fructose syrup',   label: 'Fructose Syrup (likely corn)' },
+            { term: 'fructose-glucose', label: 'Fructose-Glucose (likely corn)' },
+
+            // Corn-derived sweeteners & sugars
+            { term: 'dextrose',         label: 'Dextrose (corn sugar)' },
+            { term: 'dextrin',          label: 'Dextrin (corn-derived)' },
+            { term: 'maltodextrin',     label: 'Maltodextrin (corn-derived)' },
+            { term: 'maltose',          label: 'Maltose (often corn-derived)' },
+            { term: 'trehalose',        label: 'Trehalose (often corn-derived)' },
+            { term: 'crystalline fructose', label: 'Crystalline Fructose (corn-derived)' },
+            { term: 'confectioner',     label: "Confectioner's Sugar (contains cornstarch)" },
+            { term: 'powdered sugar',   label: 'Powdered Sugar (contains cornstarch)' },
+            { term: 'icing sugar',      label: 'Icing Sugar (contains cornstarch)' },
+            { term: 'invert sugar',     label: 'Invert Sugar (often corn-derived)' },
+            { term: 'caramel color',    label: 'Caramel Color (often corn-derived)' },
+            { term: 'caramel colour',   label: 'Caramel Colour (often corn-derived)' },
+
+            // Corn-derived starches & thickeners
+            { term: 'modified starch',       label: 'Modified Starch (often corn)' },
+            { term: 'modified food starch',  label: 'Modified Food Starch (often corn)' },
+            { term: 'food starch',           label: 'Food Starch (often corn)' },
+            { term: 'vegetable starch',      label: 'Vegetable Starch (often corn)' },
+            { term: 'starch',               label: 'Starch (often corn)' },
+            { term: 'cyclodextrin',          label: 'Cyclodextrin (corn-derived)' },
+
+            // Corn oils
+            { term: 'corn oil',          label: 'Corn Oil' },
+            { term: 'vegetable oil',     label: 'Vegetable Oil (may contain corn)' },
+            { term: 'maize oil',         label: 'Maize Oil' },
+
+            // Corn-derived acids & fermentation products
+            { term: 'citric acid',       label: 'Citric Acid (often corn-fermented)' },
+            { term: 'lactic acid',       label: 'Lactic Acid (often corn-fermented)' },
+            { term: 'ascorbic acid',     label: 'Ascorbic Acid (often corn-derived)' },
+            { term: 'fumaric acid',      label: 'Fumaric Acid (often corn-derived)' },
+            { term: 'gluconic acid',     label: 'Gluconic Acid (corn-derived)' },
+            { term: 'itaconic acid',     label: 'Itaconic Acid (corn-derived)' },
+
+            // Corn-derived alcohols & solvents
+            { term: 'ethanol',           label: 'Ethanol (often corn-derived)' },
+            { term: 'sorbitol',          label: 'Sorbitol (often corn-derived)' },
+            { term: 'mannitol',          label: 'Mannitol (often corn-derived)' },
+            { term: 'xylitol',           label: 'Xylitol (often corn-derived)' },
+            { term: 'erythritol',        label: 'Erythritol (corn-fermented)' },
+            { term: 'polydextrose',      label: 'Polydextrose (corn-derived)' },
+
+            // Corn-derived proteins & amino acids
+            { term: 'monosodium glutamate', label: 'MSG (often corn-derived)' },
+            { term: 'msg',               label: 'MSG (often corn-derived)' },
+            { term: 'lysine',            label: 'Lysine (often corn-derived)' },
+            { term: 'threonine',         label: 'Threonine (often corn-derived)' },
+
+            // Corn-derived vitamins & supplements
+            { term: 'tocopherol',        label: 'Tocopherol (often corn-derived)' },
+            { term: 'alpha tocopherol',  label: 'Alpha Tocopherol (often corn-derived)' },
+
+            // Other corn derivatives
+            { term: 'xanthan gum',       label: 'Xanthan Gum (corn-fermented)' },
+            { term: 'polylactic',        label: 'Polylactic Acid (corn-derived)' },
+            { term: 'glucono delta-lactone', label: 'Glucono Delta-Lactone (corn-derived)' },
+            { term: 'hydrolyzed vegetable protein', label: 'HVP (often corn-derived)' },
+            { term: 'natural flavor',    label: 'Natural Flavor (may contain corn)' },
+            { term: 'natural flavour',   label: 'Natural Flavour (may contain corn)' },
+        ];
+
+        // We pre-sort: longest terms first so "corn starch" matches before "corn"
+        CORN_INGREDIENTS.sort((a, b) => b.term.length - a.term.length);
+
+        /**
+         * Scans an ingredients string and returns all matching corn-derived
+         * ingredient labels. Uses word-boundary-aware matching so "acorn"
+         * doesn't false-positive on "corn".
+         */
+        function detectCornIngredients(ingredientsText) {
+            if (!ingredientsText || typeof ingredientsText !== 'string') return [];
+            
+            const lower = ingredientsText.toLowerCase();
+            const found = new Set();
+            const foundTerms = new Set(); // avoid sub-match duplication
+
+            for (const { term, label } of CORN_INGREDIENTS) {
+                // Skip if a longer term already covered this
+                if ([...foundTerms].some(ft => ft.includes(term) && ft !== term)) continue;
+
+                // Word-boundary aware check
+                // For single-word terms like "corn", ensure it's not part of
+                // "acorn", "corner", "scorn", "unicorn", etc.
+                const escapedTerm = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                // Use word boundary for short terms, looser match for multi-word
+                const regex = term.includes(' ')
+                    ? new RegExp(escapedTerm, 'i')
+                    : new RegExp(`(?<![a-z])${escapedTerm}(?![a-z])`, 'i');
+
+                if (regex.test(lower)) {
+                    found.add(label);
+                    foundTerms.add(term);
+                }
+            }
+
+            return [...found];
+        }
+
+        // ================================================================
+        // BARCODE SCANNER CLASS
+        // ================================================================
+        class CornDetector {
+            constructor() {
+                this.video = document.getElementById('video');
+                this.canvas = document.getElementById('overlay-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.status = document.getElementById('status');
+                this.productsList = document.getElementById('products-list');
+                this.productCount = document.getElementById('product-count');
+                this.emptyState = document.getElementById('empty-state');
+                this.startScreen = document.getElementById('start-screen');
+                this.startBtn = document.getElementById('start-btn');
+                this.clearBtn = document.getElementById('clear-btn');
+                this.toggleFlashBtn = document.getElementById('toggle-flash');
+                this.manualInput = document.getElementById('manual-barcode');
+                this.manualBtn = document.getElementById('manual-lookup-btn');
+
+                this.stream = null;
+                this.track = null;
+                this.useNativeAPI = false;
+                this.detectedBarcodes = new Map();
+                this.productCache = new Map();
+                this.overlayElements = [];
+                this.scanning = false;
+                this.flashEnabled = false;
+
+                this.API_BASE = 'https://world.openfoodfacts.org/api/v2/product';
+                this.pendingLookups = new Set();
+
+                this.init();
+            }
+
+            async init() {
+                if ('BarcodeDetector' in window) {
+                    try {
+                        const formats = await BarcodeDetector.getSupportedFormats();
+                        if (formats.length > 0) {
+                            this.useNativeAPI = true;
+                            this.detector = new BarcodeDetector({ formats });
+                        }
+                    } catch (err) {
+                        console.log('BarcodeDetector not available, falling back to QuaggaJS');
+                    }
+                }
+
+                this.startBtn.addEventListener('click', () => this.startCamera());
+                this.clearBtn.addEventListener('click', () => this.clearDetections());
+                this.toggleFlashBtn.addEventListener('click', () => this.toggleFlash());
+                this.manualBtn.addEventListener('click', () => this.manualLookup());
+                this.manualInput.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') this.manualLookup();
+                });
+
+                window.addEventListener('resize', () => this.resizeCanvas());
+            }
+
+            async manualLookup() {
+                const barcode = this.manualInput.value.trim();
+                if (!barcode || !/^\d{4,14}$/.test(barcode)) {
+                    this.manualInput.style.borderColor = '#DC2626';
+                    setTimeout(() => this.manualInput.style.borderColor = '', 1500);
+                    return;
+                }
+                this.manualInput.value = '';
+                await this.handleBarcodeDetection(barcode, 'manual');
+            }
+
+            async startCamera() {
+                try {
+                    this.startScreen.classList.add('hidden');
+
+                    const constraints = {
+                        video: {
+                            facingMode: 'environment',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        },
+                        audio: false
+                    };
+
+                    this.stream = await navigator.mediaDevices.getUserMedia(constraints);
+                    this.video.srcObject = this.stream;
+                    this.track = this.stream.getVideoTracks()[0];
+                    await this.video.play();
+                    this.resizeCanvas();
+                    this.scanning = true;
+                    this.status.textContent = this.useNativeAPI ?
+                        'Scanning (Native API)...' : 'Scanning (QuaggaJS)...';
+
+                    if (this.useNativeAPI) {
+                        this.scanWithNativeAPI();
+                    } else {
+                        this.initQuagga();
+                    }
+                } catch (err) {
+                    console.error('Camera error:', err);
+                    if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+                        this.status.textContent = 'Camera permission denied';
+                        this.showPermissionHelp('Camera access was denied. Please allow camera access in your browser settings.');
+                    } else if (err.name === 'OverconstrainedError') {
+                        try {
+                            this.stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                            this.video.srcObject = this.stream;
+                            await this.video.play();
+                            this.resizeCanvas();
+                            this.scanning = true;
+                            this.status.textContent = 'Scanning...';
+                            if (this.useNativeAPI) this.scanWithNativeAPI();
+                            else this.initQuagga();
+                        } catch (fallbackErr) {
+                            this.status.textContent = 'Camera access failed';
+                            alert('Unable to access camera: ' + fallbackErr.message);
+                        }
+                    } else {
+                        this.status.textContent = 'Camera access failed';
+                        alert('Unable to access camera: ' + err.message);
+                    }
+                }
+            }
+
+            showPermissionHelp(message) {
+                const helpDiv = document.createElement('div');
+                helpDiv.style.cssText = `
+                    position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+                    background:rgba(0,0,0,0.92);color:white;padding:24px;border-radius:12px;
+                    max-width:90%;z-index:2000;text-align:left;font-size:0.95rem;line-height:1.5;
+                `;
+                helpDiv.innerHTML = `
+                    <h3 style="margin-top:0;color:#EAB308;">🌽 Camera Permission Required</h3>
+                    <p>${message}</p>
+                    <p style="margin-top:12px;font-size:0.85rem;opacity:0.8;">Check your browser's address bar for camera permission settings, then refresh.</p>
+                    <button id="close-help" style="
+                        background:#D97706;color:white;border:none;padding:10px 20px;
+                        border-radius:8px;margin-top:14px;cursor:pointer;font-weight:600;
+                    ">Close</button>
+                `;
+                document.body.appendChild(helpDiv);
+                document.getElementById('close-help').addEventListener('click', () => {
+                    document.body.removeChild(helpDiv);
+                    this.startScreen.classList.remove('hidden');
+                });
+            }
+
+            // ===== API LOOKUP =====
+            async lookupProduct(barcode) {
+                if (this.productCache.has(barcode)) return this.productCache.get(barcode);
+                if (this.pendingLookups.has(barcode)) return null;
+
+                this.pendingLookups.add(barcode);
+
+                try {
+                    const response = await fetch(`${this.API_BASE}/${barcode}`, {
+                        headers: { 'Accept': 'application/json' }
+                    });
+
+                    if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+                    const data = await response.json();
+
+                    if (data.status === 1 && data.product) {
+                        const p = data.product;
+                        const ingredientsText = p.ingredients_text || p.ingredients_text_en || '';
+                        const cornHits = detectCornIngredients(ingredientsText);
+
+                        const productInfo = {
+                            barcode,
+                            title: p.product_name || p.product_name_en || 'Unknown Product',
+                            brand: p.brands || '',
+                            image: p.image_url || p.image_front_url || '',
+                            ingredientsRaw: ingredientsText,
+                            cornIngredients: cornHits,
+                            hasCorn: cornHits.length > 0,
+                            found: true,
+                            timestamp: Date.now(),
+                        };
+
+                        this.productCache.set(barcode, productInfo);
+                        return productInfo;
+                    } else {
+                        throw new Error('Product not found');
+                    }
+                } catch (error) {
+                    const failedProduct = {
+                        barcode,
+                        title: `Unknown Product (${barcode})`,
+                        brand: '',
+                        image: '',
+                        ingredientsRaw: '',
+                        cornIngredients: [],
+                        hasCorn: false,
+                        found: false,
+                        timestamp: Date.now(),
+                    };
+                    this.productCache.set(barcode, failedProduct);
+                    return failedProduct;
+                } finally {
+                    this.pendingLookups.delete(barcode);
+                }
+            }
+
+            // ===== BARCODE HANDLING =====
+            async handleBarcodeDetection(barcode, format) {
+                const key = `${barcode}-${format}`;
+
+                if (!this.detectedBarcodes.has(key)) {
+                    this.detectedBarcodes.set(key, {
+                        barcode, format,
+                        title: 'Looking up...',
+                        loading: true,
+                    });
+                    this.updateDetectedList();
+
+                    const productInfo = await this.lookupProduct(barcode);
+
+                    if (productInfo) {
+                        this.detectedBarcodes.set(key, {
+                            ...productInfo,
+                            format,
+                            loading: false,
+                        });
+                        this.updateDetectedList();
+
+                        if (productInfo.found) {
+                            const emoji = productInfo.hasCorn ? '🌽' : '✅';
+                            this.showTemporaryMessage(`${emoji} ${productInfo.title}`);
+                        } else {
+                            this.showTemporaryMessage(`❓ Not found: ${barcode}`);
+                        }
+                    }
+                }
+
+                return this.detectedBarcodes.get(key);
+            }
+
+            // ===== RENDER LIST =====
+            updateDetectedList() {
+                const count = this.detectedBarcodes.size;
+                this.productCount.textContent = count;
+
+                if (count === 0) {
+                    this.emptyState.style.display = 'block';
+                    this.productsList.innerHTML = '';
+                    document.getElementById('stats-bar').style.display = 'none';
+                    return;
+                }
+
+                this.emptyState.style.display = 'none';
+                document.getElementById('stats-bar').style.display = 'flex';
+                this.productsList.innerHTML = '';
+
+                let totalCorny = 0, totalSafe = 0;
+
+                // Render newest first
+                const entries = [...this.detectedBarcodes.entries()].reverse();
+
+                for (const [key, data] of entries) {
+                    const card = document.createElement('div');
+                    card.className = 'product-card';
+
+                    if (data.loading) {
+                        card.innerHTML = `
+                            <div class="verdict-icon">🔍</div>
+                            <div class="product-info">
+                                <div class="product-name">Looking up...</div>
+                                <div class="barcode-num">${data.barcode}</div>
+                                <div><span class="verdict-badge loading">Checking...</span></div>
+                            </div>
+                        `;
+                    } else if (!data.found) {
+                        card.innerHTML = `
+                            <div class="verdict-icon">❓</div>
+                            <div class="product-info">
+                                <div class="product-name">Not in database</div>
+                                <div class="barcode-num">${data.barcode}</div>
+                                <div><span class="verdict-badge unknown">Unknown</span></div>
+                            </div>
+                        `;
+                    } else if (data.hasCorn) {
+                        totalCorny++;
+                        const chips = data.cornIngredients
+                            .map(ci => `<span class="offending-chip">${ci}</span>`)
+                            .join('');
+                        card.innerHTML = `
+                            <div class="verdict-icon">🌽</div>
+                            <div class="product-info">
+                                <div class="product-name">${this.escapeHtml(data.title)}</div>
+                                ${data.brand ? `<div class="product-brand">${this.escapeHtml(data.brand)}</div>` : ''}
+                                <div class="barcode-num">${data.barcode}</div>
+                                <div><span class="verdict-badge corn-found">Corn Found (${data.cornIngredients.length})</span></div>
+                                <div class="offending-list">${chips}</div>
+                            </div>
+                        `;
+                    } else {
+                        totalSafe++;
+                        card.innerHTML = `
+                            <div class="verdict-icon">✅</div>
+                            <div class="product-info">
+                                <div class="product-name">${this.escapeHtml(data.title)}</div>
+                                ${data.brand ? `<div class="product-brand">${this.escapeHtml(data.brand)}</div>` : ''}
+                                <div class="barcode-num">${data.barcode}</div>
+                                <div><span class="verdict-badge corn-free">Corn Free</span></div>
+                            </div>
+                        `;
+                    }
+
+                    this.productsList.appendChild(card);
+                }
+
+                // Update stats
+                document.getElementById('stat-total').textContent = count;
+                document.getElementById('stat-corny').textContent = totalCorny;
+                document.getElementById('stat-safe').textContent = totalSafe;
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            // ===== SCANNING =====
+            async scanWithNativeAPI() {
+                if (!this.scanning) return;
+                try {
+                    const barcodes = await this.detector.detect(this.video);
+                    this.clearOverlays();
+                    for (const barcode of barcodes) {
+                        const productData = await this.handleBarcodeDetection(barcode.rawValue, barcode.format);
+                        this.drawBarcodeOverlay(barcode, productData);
+                    }
+                } catch (err) {
+                    console.error('Scanning error:', err);
+                }
+                if (this.scanning) {
+                    requestAnimationFrame(() => this.scanWithNativeAPI());
+                }
+            }
+
+            initQuagga() {
+                Quagga.init({
+                    inputStream: {
+                        name: "Live", type: "LiveStream", target: this.video,
+                        constraints: { facingMode: "environment" }
+                    },
+                    locator: { patchSize: "medium", halfSample: true },
+                    numOfWorkers: navigator.hardwareConcurrency || 4,
+                    frequency: 10,
+                    decoder: {
+                        readers: [
+                            "code_128_reader", "ean_reader", "ean_8_reader",
+                            "code_39_reader", "upc_reader", "upc_e_reader"
+                        ]
+                    },
+                    locate: true
+                }, (err) => {
+                    if (err) {
+                        console.error('Quagga init error:', err);
+                        this.status.textContent = 'Scanner init failed';
+                        return;
+                    }
+                    Quagga.start();
+                });
+
+                Quagga.onDetected(async (result) => {
+                    await this.handleBarcodeDetection(result.codeResult.code, result.codeResult.format);
+                });
+
+                Quagga.onProcessed((result) => {
+                    this.clearOverlays();
+                    if (result && result.boxes) {
+                        result.boxes.filter(box => box !== result.box).forEach(box => this.drawBox(box, 'uncertain'));
+                        if (result.box && result.codeResult?.code) {
+                            this.drawBox(result.box, 'detected');
+                            const key = `${result.codeResult.code}-${result.codeResult.format}`;
+                            const pd = this.detectedBarcodes.get(key);
+                            const labelText = pd && !pd.loading ? pd.title : (pd?.loading ? 'Looking up...' : result.codeResult.code);
+                            const label = this.createLabel(
+                                labelText, '',
+                                result.box[0][0] * (this.canvas.width / this.video.videoWidth),
+                                result.box[0][1] * (this.canvas.height / this.video.videoHeight) - 10,
+                                false, pd?.loading || false
+                            );
+                            this.overlayElements.push(label);
+                        } else if (result.box) {
+                            this.drawBox(result.box, 'detected');
+                        }
+                    }
+                });
+            }
+
+            // ===== DRAWING OVERLAYS =====
+            drawBarcodeOverlay(barcode, productData = null) {
+                const { cornerPoints } = barcode;
+                this.ctx.strokeStyle = productData?.hasCorn ? '#EAB308' : '#22C55E';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                if (cornerPoints?.length > 0) {
+                    const scaleX = this.canvas.width / this.video.videoWidth;
+                    const scaleY = this.canvas.height / this.video.videoHeight;
+                    cornerPoints.forEach((point, i) => {
+                        const x = point.x * scaleX, y = point.y * scaleY;
+                        i === 0 ? this.ctx.moveTo(x, y) : this.ctx.lineTo(x, y);
+                    });
+                    this.ctx.closePath();
+                    this.ctx.stroke();
+                    const labelText = productData && !productData.loading
+                        ? (productData.hasCorn ? `🌽 ${productData.title}` : `✅ ${productData.title}`)
+                        : (productData?.loading ? '🔍 Looking up...' : barcode.rawValue);
+                    const label = this.createLabel(labelText, '', cornerPoints[0].x * scaleX, cornerPoints[0].y * scaleY - 10, false, productData?.loading || false);
+                    this.overlayElements.push(label);
+                }
+            }
+
+            drawBox(box, type) {
+                if (!box || box.length < 2) return;
+                const scaleX = this.canvas.width / this.video.videoWidth || 1;
+                const scaleY = this.canvas.height / this.video.videoHeight || 1;
+                this.ctx.strokeStyle = type === 'uncertain' ? '#92400E' : '#EAB308';
+                this.ctx.lineWidth = type === 'uncertain' ? 2 : 3;
+                this.ctx.setLineDash(type === 'uncertain' ? [5, 5] : []);
+                this.ctx.beginPath();
+                this.ctx.moveTo(box[0][0] * scaleX, box[0][1] * scaleY);
+                box.forEach(point => this.ctx.lineTo(point[0] * scaleX, point[1] * scaleY));
+                this.ctx.closePath();
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+            }
+
+            createLabel(value, category, x, y, uncertain = false, loading = false) {
+                const label = document.createElement('div');
+                label.className = `barcode-label ${uncertain ? 'uncertain' : ''} ${loading ? 'loading' : ''}`;
+                label.innerHTML = loading
+                    ? '<div style="color:#FEF9C3;">🔍 Looking up...</div>'
+                    : `<div style="font-weight:bold;font-size:0.85em;">${value}</div>`;
+                label.style.left = `${x}px`;
+                label.style.top = `${y}px`;
+                document.getElementById('scanner-container').appendChild(label);
+                return label;
+            }
+
+            clearOverlays() {
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.overlayElements.forEach(el => el?.parentNode?.removeChild(el));
+                this.overlayElements = [];
+            }
+
+            resizeCanvas() {
+                const rect = document.getElementById('scanner-container').getBoundingClientRect();
+                this.canvas.width = rect.width;
+                this.canvas.height = rect.height;
+            }
+
+            showTemporaryMessage(message) {
+                const orig = this.status.textContent;
+                this.status.textContent = message;
+                setTimeout(() => { this.status.textContent = orig; }, 3000);
+            }
+
+            clearDetections() {
+                this.detectedBarcodes.clear();
+                this.productCache.clear();
+                this.pendingLookups.clear();
+                this.clearOverlays();
+                this.updateDetectedList();
+                this.showTemporaryMessage('List cleared!');
+            }
+
+            async toggleFlash() {
+                if (!this.track) return;
+                try {
+                    this.flashEnabled = !this.flashEnabled;
+                    await this.track.applyConstraints({ advanced: [{ torch: this.flashEnabled }] });
+                    this.toggleFlashBtn.style.background = this.flashEnabled ? 'rgba(255,255,0,0.3)' : '';
+                } catch (err) {
+                    console.error('Flash error:', err);
+                }
+            }
+
+            stop() {
+                this.scanning = false;
+                if (!this.useNativeAPI && typeof Quagga !== 'undefined') Quagga.stop();
+                if (this.stream) this.stream.getTracks().forEach(t => t.stop());
+                this.clearOverlays();
+            }
+        }
+
+        let scanner;
+        window.addEventListener('DOMContentLoaded', () => { scanner = new CornDetector(); });
+        window.addEventListener('beforeunload', () => { if (scanner) scanner.stop(); });
+    </script>
+</body>
+</html>
